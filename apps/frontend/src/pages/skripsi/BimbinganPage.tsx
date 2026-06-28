@@ -9,12 +9,13 @@ import {
   getBimbinganBySkripsi,
   rejectBimbingan,
   requestBimbingan,
-  validateBimbingan
+  validateBimbingan,
 } from "../../services/bimbingan";
 import {
   approveMajuSidang,
   getBimbinganCounter,
-  getMySkripsi
+  getMySkripsi,
+  getSkripsiList
 } from "../../services/skripsi";
 import type { BimbinganLog } from "../../types/bimbingan";
 import type { SkripsiSummary } from "../../types/skripsi";
@@ -39,7 +40,7 @@ function formatDateTime(value?: string | null) {
 }
 
 export default function BimbinganPage() {
-  const { hasRole } = useAuth();
+  const { user, hasRole } = useAuth();
   const queryClient = useQueryClient();
 
   const isMahasiswa = hasRole("mahasiswa");
@@ -48,13 +49,6 @@ export default function BimbinganPage() {
     "dosen_penguji",
     "dosen_koordinator"
   ]);
-  const canApproveMajuSidang = hasRole([
-    "admin",
-    "dosen_koordinator",
-    "ketua_prodi",
-    "staf_prodi"
-  ]);
-
   const [selectedSkripsiId, setSelectedSkripsiId] = useState("");
   const [requestForm, setRequestForm] = useState({
     dosenId: "",
@@ -62,10 +56,25 @@ export default function BimbinganPage() {
     jadwalSelesai: "",
     topik: ""
   });
-
-  const mySkripsiQuery = useQuery({
+    const mySkripsiQuery = useQuery({
     queryKey: ["my-skripsi"],
     queryFn: getMySkripsi
+  });
+
+  const canManageBimbingan = hasRole([
+  "admin",
+  "dosen_koordinator",
+  "ketua_prodi",
+  "staf_prodi"
+]);
+
+  const managedSkripsiQuery = useQuery({
+    queryKey: ["managed-skripsi-for-bimbingan"],
+    queryFn: () =>
+      getSkripsiList({
+        limit: 100
+      }),
+    enabled: canManageBimbingan
   });
 
   const dashboardQuery = useQuery({
@@ -88,8 +97,21 @@ export default function BimbinganPage() {
       return dosenAssignments.map((item) => item.skripsi);
     }
 
-    return mySkripsiQuery.data ?? [];
-  }, [isMahasiswa, isDosen, mySkripsiQuery.data, dosenAssignments]);
+    if (canManageBimbingan) {
+      return (managedSkripsiQuery.data?.data ?? []).filter((item) =>
+        ["KOMPRE", "SIDANG_SKRIPSI"].includes(item.tahap || "")
+      ) as SkripsiSummary[];
+    }
+
+    return [];
+  }, [
+    isMahasiswa,
+    isDosen,
+    canManageBimbingan,
+    mySkripsiQuery.data,
+    dosenAssignments,
+    managedSkripsiQuery.data
+  ]);
 
   useEffect(() => {
     if (!selectedSkripsiId && skripsiOptions.length > 0) {
@@ -212,7 +234,8 @@ export default function BimbinganPage() {
         queryClient.invalidateQueries({ queryKey: ["dashboard-summary-for-bimbingan"] })
       ]);
 
-      alert("Skripsi berhasil masuk status SIAP SIDANG.");
+    alert("Mahasiswa berhasil disetujui maju sidang. Status berubah menjadi MENUNGGU_JADWAL.");    
+  
     },
     onError: (error) => {
       alert(getApiErrorMessage(error, "Gagal approve maju sidang."));
@@ -242,6 +265,18 @@ export default function BimbinganPage() {
     selectedSkripsi?.dosenSkripsi?.filter(
       (item) => item.peran === "PEMBIMBING" && item.isActive
     ) ?? [];
+
+  const isSelectedFromDosenAssignments = Boolean(
+    selectedSkripsi &&
+      dosenAssignments.some((item) => item.skripsi.id === selectedSkripsi.id)
+  );
+
+  const isPembimbingAktifUntukSkripsi =
+    pembimbingOptions.some((item) => item.dosen?.id === user?.id) ||
+    (isSelectedFromDosenAssignments &&
+      hasRole(["dosen_pembimbing", "dosen_koordinator", "ketua_prodi"]));
+
+  const canApproveMajuSidang = isPembimbingAktifUntukSkripsi;
 
   function handleRequestSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -359,20 +394,20 @@ export default function BimbinganPage() {
                   className="primary-button"
                   disabled={
                     approveSidangMutation.isPending ||
-                    selectedSkripsi.status === "SIAP_SIDANG"
+                    selectedSkripsi.status === "MENUNGGU_JADWAL"
                   }
                   onClick={() => approveSidangMutation.mutate(selectedSkripsi.id)}
                 >
-                  {selectedSkripsi.status === "SIAP_SIDANG"
-                    ? "Sudah Siap Sidang"
+                  {selectedSkripsi.status === "MENUNGGU_JADWAL"
+                    ? "Sudah Menunggu Jadwal"
                     : approveSidangMutation.isPending
                       ? "Memproses..."
                       : "Approve Maju Sidang"}
                 </button>
               ) : (
                 <div className="state-card success">
-                  8/8 bimbingan sudah tervalidasi. Silakan menunggu admin atau koordinator
-                  menyetujui maju sidang.
+                  8/8 bimbingan sudah tervalidasi. Pengajuan maju sidang hanya dapat
+                  disetujui oleh dosen pembimbing aktif mahasiswa ini.
                 </div>
               )
             ) : (

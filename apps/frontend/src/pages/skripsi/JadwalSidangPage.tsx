@@ -11,9 +11,18 @@ import { getRuang } from "../../services/masterData";
 import { getSkripsiList } from "../../services/skripsi";
 import type { JadwalSidangStatus } from "../../types/jadwal";
 import StatusBadge from "../../components/ui/StatusBadge";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 function toIso(value: string) {
+  if (!value) return "";
+
   return new Date(value).toISOString();
+}
+
+function isValidScheduleRange(waktuMulai: string, waktuSelesai: string) {
+  if (!waktuMulai || !waktuSelesai) return false;
+
+  return new Date(waktuSelesai).getTime() > new Date(waktuMulai).getTime();
 }
 
 function formatDateTime(value: string) {
@@ -38,6 +47,8 @@ export default function JadwalSidangPage() {
     tempatManual: "",
     linkVicon: ""
   });
+  const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const jadwalQuery = useQuery({
     queryKey: ["jadwal-sidang"],
@@ -67,16 +78,21 @@ export default function JadwalSidangPage() {
       createJadwalSidang({
         skripsiId: form.skripsiId,
         ruangId: form.ruangId || null,
-        tanggal: toIso(form.tanggal),
+        tanggal: toIso(form.tanggal || form.waktuMulai),
         waktuMulai: toIso(form.waktuMulai),
         waktuSelesai: toIso(form.waktuSelesai),
         tempatManual: form.tempatManual || null,
         linkVicon: form.linkVicon || null,
         pengujiIds: []
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] });
-      queryClient.invalidateQueries({ queryKey: ["skripsi-menunggu-jadwal"] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] }),
+        queryClient.invalidateQueries({ queryKey: ["skripsi-menunggu-jadwal"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-summary-for-bimbingan"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] })
+      ]);
+
       setForm({
         skripsiId: "",
         ruangId: "",
@@ -86,6 +102,18 @@ export default function JadwalSidangPage() {
         tempatManual: "",
         linkVicon: ""
       });
+
+      setFormError("");
+      setSuccessMessage("Jadwal sidang berhasil dibuat.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(
+        getApiErrorMessage(
+          error,
+          "Gagal membuat jadwal. Pastikan skripsi berstatus MENUNGGU_JADWAL dan ruang tidak bentrok."
+        )
+      );
     }
   });
 
@@ -97,13 +125,33 @@ export default function JadwalSidangPage() {
       id: string;
       status: JadwalSidangStatus;
     }) => updateJadwalSidangStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] });
+      setSuccessMessage("Status jadwal sidang berhasil diperbarui.");
+    },
+    onError: (error) => {
+      setFormError(getApiErrorMessage(error, "Gagal memperbarui status jadwal."));
     }
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    setFormError("");
+    setSuccessMessage("");
+
+    if (!isValidScheduleRange(form.waktuMulai, form.waktuSelesai)) {
+      setFormError("Waktu selesai harus lebih besar dari waktu mulai.");
+      return;
+    }
+
+    if (!form.ruangId && !form.tempatManual.trim() && !form.linkVicon.trim()) {
+      setFormError(
+        "Pilih ruang, isi tempat manual, atau masukkan link vicon."
+      );
+      return;
+    }
+
     createMutation.mutate();
   }
 
@@ -117,7 +165,7 @@ export default function JadwalSidangPage() {
         <p className="eyebrow">Sidang</p>
         <h1>Jadwal Sidang</h1>
         <p className="muted">
-          Buat jadwal sidang, validasi ruang, dan ubah status pelaksanaan.
+          Buat jadwal sidang untuk skripsi yang sudah disetujui maju sidang dan berstatus MENUNGGU_JADWAL.
         </p>
       </div>
 
@@ -137,7 +185,7 @@ export default function JadwalSidangPage() {
               }
               required
             >
-              <option value="">Pilih skripsi</option>
+              <option value="">Pilih skripsi status MENUNGGU_JADWAL</option>
               {skripsiCandidates.map((skripsi) => (
                 <option key={skripsi.id} value={skripsi.id}>
                   {skripsi.title || "Tanpa judul"} —{" "}
@@ -252,11 +300,10 @@ export default function JadwalSidangPage() {
             {createMutation.isPending ? "Menyimpan..." : "Buat Jadwal"}
           </button>
 
-          {createMutation.isError ? (
-            <div className="alert-error">
-              Gagal membuat jadwal. Pastikan skripsi berstatus MENUNGGU_JADWAL
-              dan ruang tidak bentrok.
-            </div>
+          {formError ? <div className="alert-error">{formError}</div> : null}
+
+          {successMessage ? (
+            <div className="state-card success">{successMessage}</div>
           ) : null}
         </form>
       ) : null}

@@ -57,12 +57,17 @@ export async function getSkripsiList(params: GetSkripsiListParams = {}) {
   return response.data;
 }
 
-export async function approveMajuSidang(skripsiId: string) {
+export async function approveMajuSidang(
+  skripsiId: string,
+  payload: {
+    catatan?: string;
+  } = {}
+) {
   const response = await api.post<{
     success: boolean;
     message: string;
     data?: unknown;
-  }>(`/skripsi/${skripsiId}/approve-maju-sidang`);
+  }>(`/skripsi/${skripsiId}/approve-maju-sidang`, payload);
 
   return response.data;
 }

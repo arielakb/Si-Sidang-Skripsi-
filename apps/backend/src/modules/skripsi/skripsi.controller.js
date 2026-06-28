@@ -422,7 +422,7 @@ export async function getSkripsiList(req, res, next) {
 export async function approveMajuSidang(req, res, next) {
   try {
     const { id } = req.params;
-    const { catatan } = req.body;
+    const { catatan } = req.body ?? {};
 
     const skripsi = await prisma.skripsi.findUnique({
       where: { id },
