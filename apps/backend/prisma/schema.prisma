@@ -1,0 +1,651 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SkripsiTahap {
+  SEMINAR_PROPOSAL
+  KOMPRE
+  SIDANG_SKRIPSI
+  FINAL
+}
+
+enum SkripsiStatus {
+  MENUNGGU_BERKAS
+  MENUNGGU_APPROVAL
+  MENUNGGU_JADWAL
+  SIAP_SIDANG
+  EVALUASI_SIDANG
+  MENUNGGU_REVISI
+  MENUNGGU_PENGESAHAN
+  MENUNGGU_FINAL
+  SELESAI
+  DITOLAK
+}
+
+enum DosenSkripsiPeran {
+  PEMBIMBING
+  PENGUJI
+  KOORDINATOR
+}
+
+enum BerkasKategori {
+  PROPOSAL
+  PRESENTASI
+  SEMINAR_REVISI
+  SIDANG_SOFTCOPY
+  SIDANG_PRESENTASI
+  PENDUKUNG
+  REVISI
+  FINAL_PDF
+  SOURCE_CODE
+  PENGESAHAN
+  FOTO_PROFIL
+  SURAT_PERJANJIAN
+  REVISI_SIDANG
+  FINAL_SKRIPSI
+  LEMBAR_PENGESAHAN
+}
+
+enum BerkasStatus {
+  DRAFT
+  DIAJUKAN
+  DISETUJUI
+  DITOLAK
+  REVISI
+}
+
+enum BimbinganStatus {
+  DIAJUKAN
+  DISETUJUI
+  DITOLAK
+  SELESAI
+  DIVALIDASI
+  DIBATALKAN
+}
+
+enum JadwalSidangStatus {
+  DIJADWALKAN
+  BERLANGSUNG
+  SELESAI
+  DIBATALKAN
+}
+
+enum PeminjamanRuangStatus {
+  DIAJUKAN
+  DISETUJUI
+  DITOLAK
+  DIBATALKAN
+}
+
+enum RevisiStatus {
+  MENUNGGU_DIAJUKAN
+  DIAJUKAN
+  DISETUJUI
+  DITOLAK
+}
+
+enum NotifikasiStatus {
+  UNREAD
+  READ
+}
+
+model User {
+  id           String     @id @default(cuid())
+  identifier   String     @unique
+  name         String
+  email        String?    @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+
+  profile                 Profile?
+  userRoles               UserRole[]
+  refreshTokens           RefreshToken[]
+  skripsiMahasiswa        Skripsi[]         @relation("SkripsiMahasiswa")
+  skripsiDosen            SkripsiDosen[]    @relation("SkripsiDosenUser")
+  assignedSkripsiDosen    SkripsiDosen[]    @relation("AssignedByUser")
+  uploadedBerkas          Berkas[]          @relation("UploadedBerkas")
+  reviewedBerkas          Berkas[]          @relation("ReviewedBerkas")
+  kodeEtik                KodeEtik[]
+  suratPerjanjianUploaded SuratPerjanjian[] @relation("SuratPerjanjianUploadedBy")
+  bimbinganMahasiswa      BimbinganLog[]    @relation("BimbinganMahasiswa")
+  bimbinganDosen          BimbinganLog[]    @relation("BimbinganDosen")
+  jadwalDibuat            JadwalSidang[]    @relation("JadwalDibuatOleh")
+  nilaiSidang             NilaiSidang[]
+  revisiDibuat            Revisi[]          @relation("RevisiDibuatOleh")
+  revisiApproved          Revisi[]          @relation("RevisiApprovedBy")
+  peminjamanMahasiswa     PeminjamanRuang[] @relation("PeminjamanMahasiswa")
+  peminjamanReviewed      PeminjamanRuang[] @relation("PeminjamanReviewedBy")
+  pengesahanApproved      Pengesahan[]
+  notifikasi              Notifikasi[]
+  logAktivitas            LogAktivitas[]
+  userBadges              UserBadge[]
+  auditLogs               AuditLog[]        @relation("AuditLogUser")
+
+  @@map("users")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  method      String
+  path        String
+  action      String?
+  statusCode  Int?
+  ip          String?
+  userAgent   String?
+  requestBody Json?
+  params      Json?
+  query       Json?
+  createdAt   DateTime @default(now())
+
+  user User? @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([method])
+  @@index([path])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Profile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  npm       String?
+  nip       String?
+  phone     String?
+  address   String?
+  photoPath String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  module      String
+  action      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Peminatan {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  skripsi Skripsi[]
+
+  @@map("peminatan")
+}
+
+model JenisSkripsi {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  skripsi Skripsi[]
+
+  @@map("jenis_skripsi")
+}
+
+model MasterRuang {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  type       String?
+  capacity   Int?
+  facilities String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  jadwalSidang    JadwalSidang[]
+  peminjamanRuang PeminjamanRuang[]
+
+  @@map("master_ruang")
+}
+
+model GradingScale {
+  id        String   @id @default(cuid())
+  letter    String
+  minScore  Decimal  @db.Decimal(5, 2)
+  maxScore  Decimal  @db.Decimal(5, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("grading_scales")
+}
+
+model Skripsi {
+  id                String        @id @default(cuid())
+  mahasiswaId       String
+  peminatanId       String?
+  jenisSkripsiId    String?
+  title             String?
+  abstract          String?
+  tahap             SkripsiTahap  @default(SEMINAR_PROPOSAL)
+  status            SkripsiStatus @default(MENUNGGU_BERKAS)
+  seminarApprovedAt DateTime?
+  selesaiAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  mahasiswa    User          @relation("SkripsiMahasiswa", fields: [mahasiswaId], references: [id])
+  peminatan    Peminatan?    @relation(fields: [peminatanId], references: [id])
+  jenisSkripsi JenisSkripsi? @relation(fields: [jenisSkripsiId], references: [id])
+
+  dosenSkripsi     SkripsiDosen[]
+  berkas           Berkas[]
+  kodeEtik         KodeEtik[]
+  suratPerjanjian  SuratPerjanjian[]
+  bimbinganLogs    BimbinganLog[]
+  jadwalSidang     JadwalSidang[]
+  nilaiSidang      NilaiSidang[]
+  revisi           Revisi[]
+  peminjamanRuang  PeminjamanRuang[]
+  pengesahan       Pengesahan?
+  gamification     Gamification?
+  nilaiAkhir       Float?
+  nilaiHuruf       String?
+  sidangApprovedAt DateTime?
+  finalApprovedAt  DateTime?
+
+  @@index([mahasiswaId])
+  @@index([status])
+  @@index([tahap])
+  @@map("skripsi")
+}
+
+model SkripsiDosen {
+  id           String            @id @default(cuid())
+  skripsiId    String
+  dosenId      String
+  peran        DosenSkripsiPeran
+  bobotNilai   Decimal?          @db.Decimal(5, 2)
+  assignedById String?
+  isActive     Boolean           @default(true)
+  assignedAt   DateTime          @default(now())
+
+  skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  dosen      User    @relation("SkripsiDosenUser", fields: [dosenId], references: [id])
+  assignedBy User?   @relation("AssignedByUser", fields: [assignedById], references: [id])
+
+  @@unique([skripsiId, dosenId, peran])
+  @@index([dosenId])
+  @@map("skripsi_dosen")
+}
+
+model Berkas {
+  id           String         @id @default(cuid())
+  skripsiId    String
+  uploadedById String
+  reviewedById String?
+  kategori     BerkasKategori
+  status       BerkasStatus   @default(DIAJUKAN)
+  originalName String
+  fileName     String
+  mimeType     String
+  sizeBytes    BigInt
+  path         String
+  catatan      String?
+  reviewedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("UploadedBerkas", fields: [uploadedById], references: [id])
+  reviewedBy User?   @relation("ReviewedBerkas", fields: [reviewedById], references: [id])
+
+  suratPerjanjian SuratPerjanjian?
+  revisi          Revisi?
+  pengesahan      Pengesahan?
+
+  @@index([skripsiId])
+  @@index([kategori])
+  @@index([status])
+  @@map("berkas")
+}
+
+model KodeEtik {
+  id               String   @id @default(cuid())
+  skripsiId        String
+  userId           String
+  statementVersion String
+  agreedAt         DateTime @default(now())
+
+  skripsi Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([skripsiId])
+  @@map("kode_etik")
+}
+
+model SuratPerjanjian {
+  id           String   @id @default(cuid())
+  skripsiId    String
+  berkasId     String   @unique
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  berkas     Berkas  @relation(fields: [berkasId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("SuratPerjanjianUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([skripsiId])
+  @@map("surat_perjanjian")
+}
+
+model BimbinganLog {
+  id               String          @id @default(cuid())
+  skripsiId        String
+  mahasiswaId      String
+  dosenId          String
+  tanggalPengajuan DateTime        @default(now())
+  jadwalMulai      DateTime?
+  jadwalSelesai    DateTime?
+  topik            String
+  hasil            String?
+  status           BimbinganStatus @default(DIAJUKAN)
+  catatanDosen     String?
+  catatanMahasiswa String?
+  validatedAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  skripsi   Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  mahasiswa User    @relation("BimbinganMahasiswa", fields: [mahasiswaId], references: [id])
+  dosen     User    @relation("BimbinganDosen", fields: [dosenId], references: [id])
+
+  @@index([skripsiId])
+  @@index([mahasiswaId])
+  @@index([dosenId])
+  @@index([status])
+  @@map("bimbingan_logs")
+}
+
+model JadwalSidang {
+  id           String             @id @default(cuid())
+  skripsiId    String
+  ruangId      String?
+  dibuatOlehId String
+  tanggal      DateTime
+  waktuMulai   DateTime
+  waktuSelesai DateTime
+  tempatManual String?
+  linkVicon    String?
+  status       JadwalSidangStatus @default(DIJADWALKAN)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  skripsi    Skripsi      @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  ruang      MasterRuang? @relation(fields: [ruangId], references: [id])
+  dibuatOleh User         @relation("JadwalDibuatOleh", fields: [dibuatOlehId], references: [id])
+
+  @@index([tanggal])
+  @@index([ruangId])
+  @@index([status])
+  @@map("jadwal_sidang")
+}
+
+model NilaiSidang {
+  id        String   @id @default(cuid())
+  skripsiId String
+  dosenId   String
+  komponen  String   @default("sidang")
+  nilai     Decimal  @default(0) @db.Decimal(5, 2)
+  bobot     Decimal  @db.Decimal(5, 2)
+  catatan   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  skripsi Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  dosen   User    @relation(fields: [dosenId], references: [id])
+
+  @@unique([skripsiId, dosenId, komponen])
+  @@index([skripsiId])
+  @@map("nilai_sidang")
+}
+
+model Revisi {
+  id           String       @id @default(cuid())
+  skripsiId    String
+  dibuatOlehId String
+  berkasId     String?      @unique
+  catatan      String
+  status       RevisiStatus @default(MENUNGGU_DIAJUKAN)
+  deadline     DateTime?
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  dibuatOleh User    @relation("RevisiDibuatOleh", fields: [dibuatOlehId], references: [id])
+  berkas     Berkas? @relation(fields: [berkasId], references: [id])
+  approvedBy User?   @relation("RevisiApprovedBy", fields: [approvedById], references: [id])
+
+  @@index([skripsiId])
+  @@index([status])
+  @@map("revisi")
+}
+
+model PeminjamanRuang {
+  id           String                @id @default(cuid())
+  skripsiId    String?
+  mahasiswaId  String
+  ruangId      String
+  tanggal      DateTime
+  waktuMulai   DateTime
+  waktuSelesai DateTime
+  keperluan    String
+  status       PeminjamanRuangStatus @default(DIAJUKAN)
+  alasan       String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  skripsi    Skripsi?    @relation(fields: [skripsiId], references: [id], onDelete: SetNull)
+  mahasiswa  User        @relation("PeminjamanMahasiswa", fields: [mahasiswaId], references: [id])
+  ruang      MasterRuang @relation(fields: [ruangId], references: [id])
+  reviewedBy User?       @relation("PeminjamanReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([ruangId])
+  @@index([tanggal])
+  @@index([status])
+  @@map("peminjaman_ruang")
+}
+
+model Pengesahan {
+  id           String   @id @default(cuid())
+  skripsiId    String   @unique
+  berkasId     String?  @unique
+  approvedById String
+  catatan      String?
+  approvedAt   DateTime @default(now())
+
+  skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  berkas     Berkas? @relation(fields: [berkasId], references: [id])
+  approvedBy User    @relation(fields: [approvedById], references: [id])
+
+  @@map("pengesahan")
+}
+
+model Notifikasi {
+  id         String           @id @default(cuid())
+  userId     String
+  title      String
+  message    String
+  type       String?
+  status     NotifikasiStatus @default(UNREAD)
+  entityType String?
+  entityId   String?
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("notifikasi")
+}
+
+model LogAktivitas {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([action])
+  @@map("log_aktivitas")
+}
+
+model Gamification {
+  id              String   @id @default(cuid())
+  skripsiId       String   @unique
+  progressPercent Int      @default(0)
+  points          Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  skripsi Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+
+  @@map("gamification")
+}
+
+model Badge {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+  awardedBy String?
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+model Mission {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  description String?
+  period      String?
+  points      Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("missions")
+}

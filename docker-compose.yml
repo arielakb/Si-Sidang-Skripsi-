@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: sisidang-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - sisidang_postgres_data:/var/lib/postgresql/data
+    networks:
+      - sisidang_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: sisidang-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    volumes:
+      - ./apps/backend:/app
+      - /app/node_modules
+      - ./uploads:${UPLOAD_DIR}
+    depends_on:
+      - postgres
+    networks:
+      - sisidang_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: sisidang-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    volumes:
+      - ./apps/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - sisidang_network
+
+volumes:
+  sisidang_postgres_data:
+
+networks:
+  sisidang_network:
+    driver: bridge
