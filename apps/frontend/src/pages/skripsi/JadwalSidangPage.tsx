@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
+import DataTable from "../../components/ui/DataTable";
+import EmptyState from "../../components/ui/EmptyState";
+import PageHeader from "../../components/ui/PageHeader";
+import StatusBadge from "../../components/ui/StatusBadge";
 import {
   createJadwalSidang,
   getJadwalSidang,
@@ -9,14 +13,82 @@ import {
 } from "../../services/jadwalSidang";
 import { getRuang } from "../../services/masterData";
 import { getSkripsiList } from "../../services/skripsi";
-import type { JadwalSidangStatus } from "../../types/jadwal";
-import StatusBadge from "../../components/ui/StatusBadge";
+import type { JadwalSidangItem, JadwalSidangStatus } from "../../types/jadwal";
 import { getApiErrorMessage } from "../../utils/apiError";
 
-function toIso(value: string) {
-  if (!value) return "";
+type DrawerMode = "create" | "detail" | null;
 
+type JadwalRow = JadwalSidangItem & {
+  skripsi?: {
+    id?: string;
+    title?: string | null;
+    mahasiswa?: {
+      name?: string | null;
+      identifier?: string | null;
+    } | null;
+  } | null;
+  ruang?: {
+    id?: string;
+    code?: string | null;
+    name?: string | null;
+  } | null;
+  penguji?: Array<{
+    id: string;
+    dosen?: {
+      name?: string | null;
+      identifier?: string | null;
+    } | null;
+  }>;
+};
+
+const emptyForm = {
+  skripsiId: "",
+  ruangId: "",
+  tanggal: "",
+  waktuMulai: "",
+  waktuSelesai: "",
+  tempatManual: "",
+  linkVicon: ""
+};
+
+const statusOptions: JadwalSidangStatus[] = [
+  "DIJADWALKAN",
+  "BERLANGSUNG",
+  "SELESAI",
+  "DIBATALKAN"
+];
+
+function toIsoDate(value: string, fallbackDateTime?: string) {
+  if (value) {
+    return new Date(`${value}T00:00:00`).toISOString();
+  }
+
+  if (fallbackDateTime) {
+    return new Date(fallbackDateTime).toISOString();
+  }
+
+  return "";
+}
+
+function toIsoDateTime(value: string) {
   return new Date(value).toISOString();
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function getTempat(row: JadwalRow) {
+  if (row.ruang) {
+    return `${row.ruang.code || ""} ${row.ruang.name || ""}`.trim();
+  }
+
+  return row.tempatManual || row.linkVicon || "-";
 }
 
 function isValidScheduleRange(waktuMulai: string, waktuSelesai: string) {
@@ -25,36 +97,25 @@ function isValidScheduleRange(waktuMulai: string, waktuSelesai: string) {
   return new Date(waktuSelesai).getTime() > new Date(waktuMulai).getTime();
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
-}
-
 export default function JadwalSidangPage() {
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
   const canManage = hasPermission("jadwal_sidang.manage");
 
-  const [form, setForm] = useState({
-    skripsiId: "",
-    ruangId: "",
-    tanggal: "",
-    waktuMulai: "",
-    waktuSelesai: "",
-    tempatManual: "",
-    linkVicon: ""
-  });
-  const [formError, setFormError] = useState("");
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [selectedJadwal, setSelectedJadwal] = useState<JadwalRow | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [form, setForm] = useState(emptyForm);
+  const [pageError, setPageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   const jadwalQuery = useQuery({
     queryKey: ["jadwal-sidang"],
     queryFn: () =>
       getJadwalSidang({
-        limit: 30
+        limit: 50
       })
   });
 
@@ -73,45 +134,59 @@ export default function JadwalSidangPage() {
     enabled: canManage
   });
 
+  const jadwalRows = (jadwalQuery.data?.data ?? []) as JadwalRow[];
+  const skripsiCandidates = skripsiCandidatesQuery.data?.data ?? [];
+  const ruangRows = ruangQuery.data ?? [];
+
+  const filteredRows = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return jadwalRows.filter((item) => {
+      const matchesSearch = `${item.skripsi?.title ?? ""} ${
+        item.skripsi?.mahasiswa?.name ?? ""
+      } ${item.status ?? ""} ${getTempat(item)}`
+        .toLowerCase()
+        .includes(keyword);
+
+      const matchesStatus = statusFilter ? item.status === statusFilter : true;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [jadwalRows, search, statusFilter]);
+
   const createMutation = useMutation({
     mutationFn: () =>
       createJadwalSidang({
         skripsiId: form.skripsiId,
         ruangId: form.ruangId || null,
-        tanggal: toIso(form.tanggal || form.waktuMulai),
-        waktuMulai: toIso(form.waktuMulai),
-        waktuSelesai: toIso(form.waktuSelesai),
-        tempatManual: form.tempatManual || null,
-        linkVicon: form.linkVicon || null,
+        tanggal: toIsoDate(form.tanggal, form.waktuMulai),
+        waktuMulai: toIsoDateTime(form.waktuMulai),
+        waktuSelesai: toIsoDateTime(form.waktuSelesai),
+        tempatManual: form.tempatManual.trim() || null,
+        linkVicon: form.linkVicon.trim() || null,
         pengujiIds: []
       }),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] }),
         queryClient.invalidateQueries({ queryKey: ["skripsi-menunggu-jadwal"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard-summary-for-bimbingan"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] })
+        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary-for-bimbingan"]
+        })
       ]);
 
-      setForm({
-        skripsiId: "",
-        ruangId: "",
-        tanggal: "",
-        waktuMulai: "",
-        waktuSelesai: "",
-        tempatManual: "",
-        linkVicon: ""
-      });
-
-      setFormError("");
+      setForm(emptyForm);
+      closeDrawer();
+      setPageError("");
       setSuccessMessage("Jadwal sidang berhasil dibuat.");
     },
     onError: (error) => {
       setSuccessMessage("");
-      setFormError(
+      setPageError(
         getApiErrorMessage(
           error,
-          "Gagal membuat jadwal. Pastikan skripsi berstatus MENUNGGU_JADWAL dan ruang tidak bentrok."
+          "Gagal membuat jadwal. Pastikan skripsi berstatus MENUNGGU_JADWAL, waktu valid, dan ruang tidak bentrok."
         )
       );
     }
@@ -127,249 +202,409 @@ export default function JadwalSidangPage() {
     }) => updateJadwalSidangStatus(id, status),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] });
-      setSuccessMessage("Status jadwal sidang berhasil diperbarui.");
+
+      setPageError("");
+      setSuccessMessage("Status jadwal berhasil diperbarui.");
     },
     onError: (error) => {
-      setFormError(getApiErrorMessage(error, "Gagal memperbarui status jadwal."));
+      setSuccessMessage("");
+      setPageError(getApiErrorMessage(error, "Gagal mengubah status jadwal."));
     }
   });
+
+  function openCreateDrawer() {
+    setDrawerMode("create");
+    setSelectedJadwal(null);
+    setForm(emptyForm);
+    setPageError("");
+    setSuccessMessage("");
+  }
+
+  function openDetailDrawer(jadwal: JadwalRow) {
+    setDrawerMode("detail");
+    setSelectedJadwal(jadwal);
+    setPageError("");
+    setSuccessMessage("");
+  }
+
+  function closeDrawer() {
+    setDrawerMode(null);
+    setSelectedJadwal(null);
+    setForm(emptyForm);
+    setPageError("");
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setFormError("");
+    setPageError("");
     setSuccessMessage("");
 
+    if (!form.skripsiId) {
+      setPageError("Pilih skripsi terlebih dahulu.");
+      return;
+    }
+
     if (!isValidScheduleRange(form.waktuMulai, form.waktuSelesai)) {
-      setFormError("Waktu selesai harus lebih besar dari waktu mulai.");
+      setPageError("Waktu selesai harus lebih besar dari waktu mulai.");
       return;
     }
 
     if (!form.ruangId && !form.tempatManual.trim() && !form.linkVicon.trim()) {
-      setFormError(
-        "Pilih ruang, isi tempat manual, atau masukkan link vicon."
-      );
+      setPageError("Pilih ruang, isi tempat manual, atau isi link vicon.");
       return;
     }
 
     createMutation.mutate();
   }
 
-  const jadwalRows = jadwalQuery.data?.data ?? [];
-  const skripsiCandidates = skripsiCandidatesQuery.data?.data ?? [];
-  const ruangRows = ruangQuery.data ?? [];
-
   return (
     <section className="page-stack">
-      <div>
-        <p className="eyebrow">Sidang</p>
-        <h1>Jadwal Sidang</h1>
-        <p className="muted">
-          Buat jadwal sidang untuk skripsi yang sudah disetujui maju sidang dan berstatus MENUNGGU_JADWAL.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Sidang"
+        title="Jadwal Sidang"
+        description="Kelola jadwal sidang untuk skripsi yang sudah disetujui maju sidang."
+      />
 
-      {canManage ? (
-        <form className="card form-stack" onSubmit={handleSubmit}>
-          <h2>Buat Jadwal Sidang</h2>
+      {successMessage ? (
+        <div className="state-card success">{successMessage}</div>
+      ) : null}
 
-          <label>
-            <span>Skripsi Siap Dijadwalkan</span>
+      {pageError && !drawerMode ? (
+        <div className="alert-error">{pageError}</div>
+      ) : null}
+
+      <section className="list-card jadwal-table-card">
+        <div className="table-toolbar master-table-toolbar">
+          <div>
+            <h2>Daftar Jadwal Sidang</h2>
+            <p className="muted">
+              List jadwal sidang, ruang, waktu, dan status pelaksanaan.
+            </p>
+          </div>
+
+          <div className="master-toolbar-actions">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari judul, mahasiswa, ruang..."
+            />
+
             <select
-              value={form.skripsiId}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  skripsiId: event.target.value
-                }))
-              }
-              required
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">Pilih skripsi status MENUNGGU_JADWAL</option>
-              {skripsiCandidates.map((skripsi) => (
-                <option key={skripsi.id} value={skripsi.id}>
-                  {skripsi.title || "Tanpa judul"} —{" "}
-                  {skripsi.mahasiswa?.name || skripsi.mahasiswaId}
+              <option value="">Semua Status</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
                 </option>
               ))}
             </select>
-          </label>
 
-          <section className="two-column compact">
-            <label>
-              <span>Ruang</span>
-              <select
-                value={form.ruangId}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    ruangId: event.target.value
-                  }))
-                }
+            {canManage ? (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={openCreateDrawer}
               >
-                <option value="">Tanpa ruang / manual</option>
-                {ruangRows.map((ruang) => (
-                  <option key={ruang.id} value={ruang.id}>
-                    {ruang.code} — {ruang.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              <span>Tempat Manual</span>
-              <input
-                value={form.tempatManual}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    tempatManual: event.target.value
-                  }))
-                }
-                placeholder="Opsional jika tanpa ruang"
-              />
-            </label>
-          </section>
-
-          <label>
-            <span>Tanggal</span>
-            <input
-              type="datetime-local"
-              value={form.tanggal}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  tanggal: event.target.value
-                }))
-              }
-              required
-            />
-          </label>
-
-          <section className="two-column compact">
-            <label>
-              <span>Waktu Mulai</span>
-              <input
-                type="datetime-local"
-                value={form.waktuMulai}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    waktuMulai: event.target.value
-                  }))
-                }
-                required
-              />
-            </label>
-
-            <label>
-              <span>Waktu Selesai</span>
-              <input
-                type="datetime-local"
-                value={form.waktuSelesai}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    waktuSelesai: event.target.value
-                  }))
-                }
-                required
-              />
-            </label>
-          </section>
-
-          <label>
-            <span>Link Vicon</span>
-            <input
-              value={form.linkVicon}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  linkVicon: event.target.value
-                }))
-              }
-              placeholder="https://meet.google.com/..."
-            />
-          </label>
-
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? "Menyimpan..." : "Buat Jadwal"}
-          </button>
-
-          {formError ? <div className="alert-error">{formError}</div> : null}
-
-          {successMessage ? (
-            <div className="state-card success">{successMessage}</div>
-          ) : null}
-        </form>
-      ) : null}
-
-      <section className="list-card">
-        <h2>Daftar Jadwal Sidang</h2>
+                Buat Jadwal
+              </button>
+            ) : null}
+          </div>
+        </div>
 
         {jadwalQuery.isLoading ? (
-          <p>Memuat jadwal...</p>
-        ) : jadwalRows.length === 0 ? (
-          <p>Belum ada jadwal sidang.</p>
+          <EmptyState
+            title="Memuat jadwal sidang..."
+            description="Mohon tunggu sebentar."
+          />
         ) : (
-          jadwalRows.map((jadwal) => (
-            <article key={jadwal.id} className="academic-card">
-              <div className="page-header-row">
-                <div>
-                  <strong>{jadwal.skripsi.title || "Tanpa judul"}</strong>
-                  <p className="muted">
-                    {jadwal.skripsi.mahasiswa.name} •{" "}
-                    {formatDateTime(jadwal.waktuMulai)} -{" "}
-                    {formatDateTime(jadwal.waktuSelesai)}
-                  </p>
-                  <small>
-                    Ruang: {jadwal.ruang?.name || jadwal.tempatManual || "-"}
-                  </small>
-                </div>
-
-               <StatusBadge value={jadwal.status} size="sm" />
-              </div>
-
-              <div className="mini-grid">
-                <span>Peminatan: {jadwal.skripsi.peminatan?.name || "-"}</span>
-                <span>Vicon: {jadwal.linkVicon || "-"}</span>
-                <span>Status skripsi: {jadwal.skripsi.status}</span>
-              </div>
-
-              {canManage ? (
-                <div className="row-inline">
-                  {(
-                    [
-                      "DIJADWALKAN",
-                      "BERLANGSUNG",
-                      "SELESAI",
-                      "DIBATALKAN"
-                    ] as JadwalSidangStatus[]
-                  ).map((status) => (
+          <DataTable
+            data={filteredRows}
+            emptyMessage="Belum ada jadwal sidang"
+            columns={[
+              {
+                key: "no",
+                header: "No",
+                align: "center",
+                render: (_item, index) => index + 1
+              },
+              {
+                key: "skripsi",
+                header: "Skripsi",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{item.skripsi?.title || "Tanpa judul"}</strong>
+                    <span>
+                      {item.skripsi?.mahasiswa?.name || "Mahasiswa tidak tersedia"}
+                    </span>
+                  </div>
+                )
+              },
+              {
+                key: "waktu",
+                header: "Waktu",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{formatDateTime(item.waktuMulai)}</strong>
+                    <span>Selesai: {formatDateTime(item.waktuSelesai)}</span>
+                  </div>
+                )
+              },
+              {
+                key: "tempat",
+                header: "Tempat",
+                render: (item) => getTempat(item)
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                render: (item) => <StatusBadge value={item.status} size="sm" />
+              },
+              {
+                key: "actions",
+                header: "Aksi",
+                align: "right",
+                render: (item) => (
+                  <div className="table-actions">
                     <button
-                      key={status}
+                      type="button"
                       className="secondary-button"
-                      onClick={() =>
-                        statusMutation.mutate({
-                          id: jadwal.id,
-                          status
-                        })
-                      }
-                      disabled={jadwal.status === status}
+                      onClick={() => openDetailDrawer(item)}
                     >
-                      {status}
+                      Detail
                     </button>
-                  ))}
-                </div>
-              ) : null}
-            </article>
-          ))
+                  </div>
+                )
+              }
+            ]}
+          />
         )}
       </section>
+
+      {drawerMode ? (
+        <div className="crud-drawer-backdrop" role="presentation">
+          <aside className="crud-drawer jadwal-drawer" aria-label="Form jadwal">
+            <div className="crud-drawer-head">
+              <div>
+                <p className="eyebrow">
+                  {drawerMode === "create" ? "Tambah Data" : "Detail Data"}
+                </p>
+                <h2>
+                  {drawerMode === "create"
+                    ? "Buat Jadwal Sidang"
+                    : "Detail Jadwal Sidang"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeDrawer}
+              >
+                Tutup
+              </button>
+            </div>
+
+            {pageError ? <div className="alert-error">{pageError}</div> : null}
+
+            {drawerMode === "create" ? (
+              <form className="form-stack" onSubmit={handleSubmit}>
+                <label>
+                  <span>Skripsi Status MENUNGGU_JADWAL</span>
+                  <select
+                    value={form.skripsiId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        skripsiId: event.target.value
+                      }))
+                    }
+                    required
+                  >
+                    <option value="">Pilih skripsi</option>
+                    {skripsiCandidates.map((skripsi) => (
+                      <option key={skripsi.id} value={skripsi.id}>
+                        {skripsi.title || "Tanpa judul"} — {skripsi.status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Tanggal</span>
+                  <input
+                    type="date"
+                    value={form.tanggal}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        tanggal: event.target.value
+                      }))
+                    }
+                  />
+                </label>
+
+                <label>
+                  <span>Waktu Mulai</span>
+                  <input
+                    type="datetime-local"
+                    value={form.waktuMulai}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        waktuMulai: event.target.value
+                      }))
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Waktu Selesai</span>
+                  <input
+                    type="datetime-local"
+                    value={form.waktuSelesai}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        waktuSelesai: event.target.value
+                      }))
+                    }
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Ruang</span>
+                  <select
+                    value={form.ruangId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        ruangId: event.target.value
+                      }))
+                    }
+                  >
+                    <option value="">Tanpa ruang / gunakan manual</option>
+                    {ruangRows.map((ruang) => (
+                      <option key={ruang.id} value={ruang.id}>
+                        {ruang.code} — {ruang.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Tempat Manual</span>
+                  <input
+                    value={form.tempatManual}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        tempatManual: event.target.value
+                      }))
+                    }
+                    placeholder="Contoh: Ruang Sidang Fakultas"
+                  />
+                </label>
+
+                <label>
+                  <span>Link Vicon</span>
+                  <input
+                    value={form.linkVicon}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        linkVicon: event.target.value
+                      }))
+                    }
+                    placeholder="https://meet.google.com/..."
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={createMutation.isPending}
+                >
+                  {createMutation.isPending ? "Menyimpan..." : "Buat Jadwal"}
+                </button>
+              </form>
+            ) : selectedJadwal ? (
+              <div className="jadwal-detail-stack">
+                <div className="skripsi-detail-title">
+                  <strong>{selectedJadwal.skripsi?.title || "Tanpa judul"}</strong>
+                  <StatusBadge value={selectedJadwal.status} />
+                </div>
+
+                <div className="info-list">
+                  <div className="info-row">
+                    <span>Mahasiswa</span>
+                    <strong>{selectedJadwal.skripsi?.mahasiswa?.name || "-"}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Waktu Mulai</span>
+                    <strong>{formatDateTime(selectedJadwal.waktuMulai)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Waktu Selesai</span>
+                    <strong>{formatDateTime(selectedJadwal.waktuSelesai)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Tempat</span>
+                    <strong>{getTempat(selectedJadwal)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Link Vicon</span>
+                    <p>{selectedJadwal.linkVicon || "-"}</p>
+                  </div>
+                </div>
+
+                {canManage ? (
+                  <div className="drawer-section">
+                    <h3>Ubah Status Jadwal</h3>
+
+                    <div className="status-action-grid">
+                      {statusOptions.map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          className={
+                            selectedJadwal.status === status
+                              ? "primary-button"
+                              : status === "DIBATALKAN"
+                                ? "danger-button"
+                                : "secondary-button"
+                          }
+                          disabled={
+                            statusMutation.isPending ||
+                            selectedJadwal.status === status
+                          }
+                          onClick={() =>
+                            statusMutation.mutate({
+                              id: selectedJadwal.id,
+                              status
+                            })
+                          }
+                        >
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }

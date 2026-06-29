@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
+import BrandMark from "../ui/BrandMark";
 import RoleBadge from "../ui/RoleBadge";
 import UserAvatar from "../ui/UserAvatar";
 
@@ -8,6 +9,7 @@ type MenuItem = {
   key: string;
   label: string;
   to: string;
+  icon: string;
   roles?: string[];
   permissions?: string[];
 };
@@ -16,18 +18,21 @@ const menuItems: MenuItem[] = [
   {
     key: "dashboard",
     label: "Dashboard",
-    to: "/app"
+    to: "/app",
+    icon: "⌂"
   },
   {
     key: "skripsi",
     label: "Data Skripsi",
     to: "/app/skripsi",
+    icon: "□",
     permissions: ["skripsi.read"]
   },
   {
     key: "seminar-review",
     label: "Review Seminar",
     to: "/app/seminar-review",
+    icon: "✓",
     roles: ["admin", "dosen_penguji", "dosen_koordinator", "ketua_prodi"],
     permissions: ["skripsi.read"]
   },
@@ -35,6 +40,7 @@ const menuItems: MenuItem[] = [
     key: "assign-pembimbing",
     label: "Assign Pembimbing",
     to: "/app/assign-pembimbing",
+    icon: "+",
     roles: ["admin", "dosen_koordinator", "ketua_prodi", "staf_prodi"],
     permissions: ["skripsi.assign_dosen"]
   },
@@ -42,12 +48,14 @@ const menuItems: MenuItem[] = [
     key: "bimbingan",
     label: "Bimbingan",
     to: "/app/bimbingan",
+    icon: "◌",
     permissions: ["bimbingan.read"]
   },
   {
     key: "progress",
     label: "Progress Saya",
     to: "/app/progress",
+    icon: "↗",
     roles: ["mahasiswa"],
     permissions: ["gamification.read"]
   },
@@ -55,18 +63,21 @@ const menuItems: MenuItem[] = [
     key: "jadwal-sidang",
     label: "Jadwal Sidang",
     to: "/app/jadwal-sidang",
+    icon: "◷",
     permissions: ["jadwal_sidang.read"]
   },
   {
     key: "nilai-sidang",
     label: "Nilai Sidang",
     to: "/app/nilai-sidang",
+    icon: "★",
     permissions: ["nilai.read"]
   },
   {
     key: "revisi-final",
     label: "Revisi & Final",
     to: "/app/revisi-final",
+    icon: "✎",
     permissions: [
       "revisi.create",
       "revisi.upload",
@@ -78,45 +89,55 @@ const menuItems: MenuItem[] = [
     key: "peminjaman-ruang",
     label: "Peminjaman Ruang",
     to: "/app/peminjaman-ruang",
+    icon: "▣",
     permissions: ["ruang.borrow", "ruang.approve"]
   },
   {
     key: "users",
     label: "User Management",
     to: "/app/users",
+    icon: "◉",
     permissions: ["user.read"]
   },
   {
     key: "master-data",
     label: "Master Data",
     to: "/app/master-data",
+    icon: "≡",
+    roles: ["admin", "dosen_koordinator", "ketua_prodi"],
     permissions: ["master_data.read", "master_data.manage"]
   },
   {
     key: "laporan",
     label: "Laporan",
     to: "/app/laporan",
+    icon: "▤",
     permissions: ["laporan.read"]
   },
   {
     key: "audit-logs",
     label: "Audit Log",
     to: "/app/audit-logs",
+    icon: "◇",
     permissions: ["audit.read"]
   },
   {
     key: "notifications",
     label: "Notifikasi",
     to: "/app/notifications",
+    icon: "●",
     permissions: ["notification.read"]
   },
   {
     key: "leaderboard",
     label: "Leaderboard",
     to: "/app/leaderboard",
+    icon: "◆",
     permissions: ["gamification.read"]
   }
 ];
+
+const menuGroupOrder = ["Utama", "Akademik", "Administrasi", "Monitoring"];
 
 function getRoleContextLabel(roles: string[]) {
   if (roles.includes("admin")) return "Administrator";
@@ -136,10 +157,6 @@ function getMenuLabel(item: MenuItem, roles: string[]) {
     return "Skripsi Saya";
   }
 
-  if (item.key === "skripsi") {
-    return "Data Skripsi";
-  }
-
   if (item.key === "bimbingan" && roles.includes("dosen_pembimbing")) {
     return "Bimbingan Mahasiswa";
   }
@@ -156,6 +173,7 @@ function getMenuGroup(item: MenuItem) {
     [
       "skripsi",
       "seminar-review",
+      "assign-pembimbing",
       "bimbingan",
       "progress",
       "jadwal-sidang",
@@ -194,10 +212,12 @@ export default function DashboardLayout() {
   const { user, logout, hasRole, hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const roles = user?.roles ?? [];
   const roleLabel = getRoleContextLabel(roles);
+  const currentPageLabel = getCurrentPageLabel(location.pathname, roles);
 
   const visibleMenu = useMemo(() => {
     return menuItems.filter((item) => {
@@ -223,8 +243,6 @@ export default function DashboardLayout() {
     }, {});
   }, [visibleMenu]);
 
-  const currentPageLabel = getCurrentPageLabel(location.pathname, roles);
-
   async function handleLogout() {
     await logout();
     navigate("/login", { replace: true });
@@ -235,7 +253,7 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="dashboard-shell">
+    <div className="dashboard-shell sisidang-layout">
       <button
         type="button"
         className={`sidebar-overlay ${isSidebarOpen ? "show" : ""}`}
@@ -244,14 +262,8 @@ export default function DashboardLayout() {
       />
 
       <aside className={`sidebar ${isSidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-mobile-head">
-          <div className="brand">
-            <div className="brand-mark">S</div>
-            <div>
-              <strong>Sisidang</strong>
-              <small>Administrasi Skripsi</small>
-            </div>
-          </div>
+        <div className="sidebar-brand-wrap">
+          <BrandMark />
 
           <button
             type="button"
@@ -267,8 +279,9 @@ export default function DashboardLayout() {
           <div className="sidebar-user-main">
             <UserAvatar name={user?.name} />
             <div>
-              <small>Role aktif</small>
-              <strong>{roleLabel}</strong>
+              <small>Login sebagai</small>
+              <strong>{user?.name || "User"}</strong>
+              <span>{roleLabel}</span>
             </div>
           </div>
 
@@ -281,31 +294,39 @@ export default function DashboardLayout() {
           </div>
         </div>
 
-        <nav className="sidebar-nav">
-          {Object.entries(groupedMenu).map(([group, items]) => (
-            <div key={group} className="sidebar-group">
-              <p>{group}</p>
+        <nav className="sidebar-nav" aria-label="Navigasi aplikasi">
+          {menuGroupOrder
+            .filter((group) => groupedMenu[group]?.length)
+            .map((group) => (
+              <div key={group} className="sidebar-group">
+                <p className="sidebar-section-title">{group}</p>
 
-              {items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === "/app"}
-                  onClick={closeSidebar}
-                  className={({ isActive }) =>
-                    isActive ? "nav-item active" : "nav-item"
-                  }
-                >
-                  <span>{getMenuLabel(item, roles)}</span>
-                </NavLink>
-              ))}
-            </div>
-          ))}
+                {groupedMenu[group].map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/app"}
+                    onClick={closeSidebar}
+                    className={({ isActive }) =>
+                      isActive ? "nav-item active" : "nav-item"
+                    }
+                  >
+                    <span className="nav-icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                    <span className="nav-label">{getMenuLabel(item, roles)}</span>
+                  </NavLink>
+                ))}
+              </div>
+            ))}
         </nav>
 
-        <a href="/" className="public-link" onClick={closeSidebar}>
-          Dashboard Publik
-        </a>
+        <div className="sidebar-footer">
+          <a href="/" className="public-link" onClick={closeSidebar}>
+            <span>↗</span>
+            Dashboard Publik
+          </a>
+        </div>
       </aside>
 
       <section className="main-area">
@@ -321,22 +342,26 @@ export default function DashboardLayout() {
             </button>
 
             <div className="topbar-page">
-              <p className="eyebrow">Sisidang</p>
+              <p className="eyebrow">Sisidang TI</p>
               <strong>{currentPageLabel}</strong>
-              <small>{roleLabel}</small>
+              <small>Program Studi Teknik Informatika</small>
             </div>
           </div>
 
           <div className="topbar-actions">
-          <div className="topbar-user topbar-user-rich">
-            <UserAvatar name={user?.name} size="sm" />
-            <div>
-              <small>Login sebagai</small>
-              <strong>{user?.name || "User"}</strong>
+            <div className="topbar-user topbar-user-rich">
+              <UserAvatar name={user?.name} size="sm" />
+              <div>
+                <small>{roleLabel}</small>
+                <strong>{user?.name || "User"}</strong>
+              </div>
             </div>
-          </div>
 
-            <button className="secondary-button logout-button" onClick={handleLogout}>
+            <button
+              type="button"
+              className="secondary-button logout-button"
+              onClick={handleLogout}
+            >
               Logout
             </button>
           </div>

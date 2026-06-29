@@ -1,7 +1,11 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
+import DataTable from "../../components/ui/DataTable";
+import EmptyState from "../../components/ui/EmptyState";
+import PageHeader from "../../components/ui/PageHeader";
+import StatusBadge from "../../components/ui/StatusBadge";
 import { getRuang } from "../../services/masterData";
 import {
   approvePeminjamanRuang,
@@ -10,308 +14,642 @@ import {
   getPeminjamanRuang,
   rejectPeminjamanRuang
 } from "../../services/peminjamanRuang";
-import { getMySkripsi } from "../../services/skripsi";
-import StatusBadge from "../../components/ui/StatusBadge";
+import type { PeminjamanRuangItem } from "../../types/jadwal";
+import { getApiErrorMessage } from "../../utils/apiError";
 
-function toIso(value: string) {
+type DrawerMode = "create" | "detail" | null;
+
+type PeminjamanRow = PeminjamanRuangItem & {
+  mahasiswa?: {
+    id?: string;
+    name?: string | null;
+    identifier?: string | null;
+    email?: string | null;
+  } | null;
+  reviewedBy?: {
+    id?: string;
+    name?: string | null;
+    identifier?: string | null;
+  } | null;
+  skripsi?: {
+    id?: string;
+    title?: string | null;
+  } | null;
+};
+
+const emptyForm = {
+  ruangId: "",
+  tanggal: "",
+  waktuMulai: "",
+  waktuSelesai: "",
+  keperluan: ""
+};
+
+const statusOptions = ["DIAJUKAN", "DISETUJUI", "DITOLAK", "DIBATALKAN"];
+
+function toIsoDate(value: string, fallbackDateTime?: string) {
+  if (value) {
+    return new Date(`${value}T00:00:00`).toISOString();
+  }
+
+  if (fallbackDateTime) {
+    return new Date(fallbackDateTime).toISOString();
+  }
+
+  return "";
+}
+
+function toIsoDateTime(value: string) {
   return new Date(value).toISOString();
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium"
+  }).format(new Date(value));
+}
+
+function getRuangLabel(item: PeminjamanRow) {
+  const code = item.ruang?.code || "";
+  const name = item.ruang?.name || "";
+
+  return `${code} ${name}`.trim() || "-";
+}
+
+function getPeminjamLabel(item: PeminjamanRow) {
+  return item.mahasiswa?.name || item.mahasiswaId || "-";
+}
+
+function isValidScheduleRange(waktuMulai: string, waktuSelesai: string) {
+  if (!waktuMulai || !waktuSelesai) return false;
+
+  return new Date(waktuSelesai).getTime() > new Date(waktuMulai).getTime();
+}
+
 export default function PeminjamanRuangPage() {
-  const { hasRole, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
-  const isMahasiswa = hasRole("mahasiswa");
+  const canBorrow = hasPermission("ruang.borrow");
   const canApprove = hasPermission("ruang.approve");
 
-  const [form, setForm] = useState({
-    skripsiId: "",
-    ruangId: "",
-    tanggal: "",
-    waktuMulai: "",
-    waktuSelesai: "",
-    keperluan: ""
-  });
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [selectedPeminjaman, setSelectedPeminjaman] =
+    useState<PeminjamanRow | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [form, setForm] = useState(emptyForm);
+  const [alasanReject, setAlasanReject] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const ruangQuery = useQuery({
     queryKey: ["ruang"],
     queryFn: getRuang
   });
 
-  const mySkripsiQuery = useQuery({
-    queryKey: ["my-skripsi"],
-    queryFn: getMySkripsi,
-    enabled: isMahasiswa
-  });
-
-  const myBorrowingQuery = useQuery({
+  const myPeminjamanQuery = useQuery({
     queryKey: ["my-peminjaman-ruang"],
     queryFn: getMyPeminjamanRuang,
-    enabled: isMahasiswa
+    enabled: !canApprove
   });
 
-  const allBorrowingQuery = useQuery({
-    queryKey: ["peminjaman-ruang"],
+  const allPeminjamanQuery = useQuery({
+    queryKey: ["peminjaman-ruang", statusFilter],
     queryFn: () =>
       getPeminjamanRuang({
-        limit: 30
+        status: statusFilter || undefined,
+        limit: 100
       }),
     enabled: canApprove
   });
 
+  const rows = useMemo(() => {
+    if (canApprove) {
+      return ((allPeminjamanQuery.data?.data ?? []) as PeminjamanRow[]);
+    }
+
+    return ((myPeminjamanQuery.data ?? []) as PeminjamanRow[]);
+  }, [canApprove, allPeminjamanQuery.data, myPeminjamanQuery.data]);
+
+  const ruangRows = ruangQuery.data ?? [];
+
+  const filteredRows = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return rows.filter((item) => {
+      const matchesSearch = `${getRuangLabel(item)} ${getPeminjamLabel(item)} ${
+        item.keperluan ?? ""
+      } ${item.status ?? ""}`
+        .toLowerCase()
+        .includes(keyword);
+
+      const matchesStatus = statusFilter ? item.status === statusFilter : true;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [rows, search, statusFilter]);
+
   const createMutation = useMutation({
     mutationFn: () =>
       createPeminjamanRuang({
-        skripsiId: form.skripsiId || null,
         ruangId: form.ruangId,
-        tanggal: toIso(form.tanggal),
-        waktuMulai: toIso(form.waktuMulai),
-        waktuSelesai: toIso(form.waktuSelesai),
-        keperluan: form.keperluan
+        tanggal: toIsoDate(form.tanggal, form.waktuMulai),
+        waktuMulai: toIsoDateTime(form.waktuMulai),
+        waktuSelesai: toIsoDateTime(form.waktuSelesai),
+        keperluan: form.keperluan.trim()
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-peminjaman-ruang"] });
-      queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] });
-      setForm({
-        skripsiId: "",
-        ruangId: "",
-        tanggal: "",
-        waktuMulai: "",
-        waktuSelesai: "",
-        keperluan: ""
-      });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-peminjaman-ruang"] }),
+        queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] })
+      ]);
+
+      setForm(emptyForm);
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Peminjaman ruang berhasil diajukan.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(
+          error,
+          "Gagal mengajukan peminjaman. Pastikan ruang dan jadwal tidak bentrok."
+        )
+      );
     }
   });
 
   const approveMutation = useMutation({
     mutationFn: approvePeminjamanRuang,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] });
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Peminjaman ruang berhasil disetujui.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(error, "Gagal menyetujui peminjaman ruang.")
+      );
     }
   });
 
   const rejectMutation = useMutation({
     mutationFn: ({ id, alasan }: { id: string; alasan: string }) =>
       rejectPeminjamanRuang(id, alasan),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] });
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Peminjaman ruang berhasil ditolak.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(error, "Gagal menolak peminjaman ruang.")
+      );
     }
   });
 
+  function openCreateDrawer() {
+    setDrawerMode("create");
+    setSelectedPeminjaman(null);
+    setForm(emptyForm);
+    setAlasanReject("");
+    setPageError("");
+    setSuccessMessage("");
+  }
+
+  function openDetailDrawer(item: PeminjamanRow) {
+    setDrawerMode("detail");
+    setSelectedPeminjaman(item);
+    setAlasanReject(item.alasan || "");
+    setPageError("");
+    setSuccessMessage("");
+  }
+
+  function closeDrawer() {
+    setDrawerMode(null);
+    setSelectedPeminjaman(null);
+    setForm(emptyForm);
+    setAlasanReject("");
+    setPageError("");
+  }
+
+  function handleFormChange(
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) {
+    const { name, value } = event.target;
+
+    setForm((current) => ({
+      ...current,
+      [name]: value
+    }));
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    setPageError("");
+    setSuccessMessage("");
+
+    if (!form.ruangId) {
+      setPageError("Pilih ruang terlebih dahulu.");
+      return;
+    }
+
+    if (!form.tanggal) {
+      setPageError("Tanggal peminjaman wajib diisi.");
+      return;
+    }
+
+    if (!isValidScheduleRange(form.waktuMulai, form.waktuSelesai)) {
+      setPageError("Waktu selesai harus lebih besar dari waktu mulai.");
+      return;
+    }
+
+    if (!form.keperluan.trim()) {
+      setPageError("Keperluan peminjaman wajib diisi.");
+      return;
+    }
+
     createMutation.mutate();
   }
 
-  function handleReject(id: string) {
-    const alasan = window.prompt("Alasan penolakan:");
+  function handleReject() {
+    if (!selectedPeminjaman) return;
 
-    if (!alasan) {
+    if (!alasanReject.trim()) {
+      setPageError("Alasan penolakan wajib diisi.");
       return;
     }
 
     rejectMutation.mutate({
-      id,
-      alasan
+      id: selectedPeminjaman.id,
+      alasan: alasanReject.trim()
     });
   }
 
-  const ruangRows = ruangQuery.data ?? [];
-  const mySkripsiRows = mySkripsiQuery.data ?? [];
-  const rows = canApprove
-    ? allBorrowingQuery.data?.data ?? []
-    : myBorrowingQuery.data ?? [];
+  const isLoading = canApprove
+    ? allPeminjamanQuery.isLoading
+    : myPeminjamanQuery.isLoading;
+
+  const canReviewSelected =
+    canApprove && selectedPeminjaman?.status === "DIAJUKAN";
 
   return (
     <section className="page-stack">
-      <div>
-        <p className="eyebrow">Ruang</p>
-        <h1>Peminjaman Ruang</h1>
-        <p className="muted">
-          Ajukan peminjaman ruang dan kelola approval peminjaman.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Ruang"
+        title="Peminjaman Ruang"
+        description="Ajukan peminjaman ruang dan kelola approval peminjaman ruang sidang."
+      />
 
-      {isMahasiswa ? (
-        <form className="card form-stack" onSubmit={handleSubmit}>
-          <h2>Ajukan Peminjaman Ruang</h2>
-
-          <label>
-            <span>Skripsi</span>
-            <select
-              value={form.skripsiId}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  skripsiId: event.target.value
-                }))
-              }
-            >
-              <option value="">Tanpa relasi skripsi</option>
-              {mySkripsiRows.map((skripsi) => (
-                <option key={skripsi.id} value={skripsi.id}>
-                  {skripsi.title || "Tanpa judul"} — {skripsi.status}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>Ruang</span>
-            <select
-              value={form.ruangId}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  ruangId: event.target.value
-                }))
-              }
-              required
-            >
-              <option value="">Pilih ruang</option>
-              {ruangRows.map((ruang) => (
-                <option key={ruang.id} value={ruang.id}>
-                  {ruang.code} — {ruang.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <section className="two-column compact">
-            <label>
-              <span>Tanggal</span>
-              <input
-                type="datetime-local"
-                value={form.tanggal}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    tanggal: event.target.value
-                  }))
-                }
-                required
-              />
-            </label>
-
-            <label>
-              <span>Waktu Mulai</span>
-              <input
-                type="datetime-local"
-                value={form.waktuMulai}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    waktuMulai: event.target.value
-                  }))
-                }
-                required
-              />
-            </label>
-          </section>
-
-          <label>
-            <span>Waktu Selesai</span>
-            <input
-              type="datetime-local"
-              value={form.waktuSelesai}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  waktuSelesai: event.target.value
-                }))
-              }
-              required
-            />
-          </label>
-
-          <label>
-            <span>Keperluan</span>
-            <textarea
-              value={form.keperluan}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  keperluan: event.target.value
-                }))
-              }
-              placeholder="Contoh: Latihan presentasi sidang skripsi"
-              required
-            />
-          </label>
-
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? "Mengajukan..." : "Ajukan Peminjaman"}
-          </button>
-
-          {createMutation.isError ? (
-            <div className="alert-error">
-              Gagal mengajukan peminjaman. Pastikan ruang dan jadwal tidak
-              bentrok.
-            </div>
-          ) : null}
-        </form>
+      {successMessage ? (
+        <div className="state-card success">{successMessage}</div>
       ) : null}
 
-      <section className="list-card">
-        <h2>{canApprove ? "Semua Peminjaman" : "Peminjaman Saya"}</h2>
+      {pageError && !drawerMode ? (
+        <div className="alert-error">{pageError}</div>
+      ) : null}
 
-        {rows.length === 0 ? (
-          <p>Belum ada data peminjaman ruang.</p>
+      <section className="list-card peminjaman-table-card">
+        <div className="table-toolbar master-table-toolbar">
+          <div>
+            <h2>{canApprove ? "Semua Peminjaman" : "Peminjaman Saya"}</h2>
+            <p className="muted">
+              List peminjaman ruang, jadwal penggunaan, keperluan, dan status approval.
+            </p>
+          </div>
+
+          <div className="master-toolbar-actions">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari ruang, peminjam, keperluan..."
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="">Semua Status</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+
+            {canBorrow ? (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={openCreateDrawer}
+              >
+                Ajukan Peminjaman
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {isLoading ? (
+          <EmptyState
+            title="Memuat peminjaman ruang..."
+            description="Mohon tunggu sebentar."
+          />
         ) : (
-          rows.map((item) => (
-            <article key={item.id} className="academic-card">
-              <div className="page-header-row">
-                <div>
-                  <strong>{item.ruang.name}</strong>
-                  <p className="muted">
-                    {formatDateTime(item.waktuMulai)} -{" "}
-                    {formatDateTime(item.waktuSelesai)}
-                  </p>
-                  <small>
-                    Mahasiswa: {item.mahasiswa?.name || "-"} •{" "}
-                    {item.keperluan}
-                  </small>
-                </div>
-
-                <StatusBadge value={item.status} size="sm" />
-              </div>
-
-              {item.alasan ? (
-                <div className="alert-error">Alasan: {item.alasan}</div>
-              ) : null}
-
-              {canApprove && item.status === "DIAJUKAN" ? (
-                <div className="row-inline">
-                  <button
-                    className="primary-button"
-                    onClick={() => approveMutation.mutate(item.id)}
-                  >
-                    Approve
-                  </button>
-
-                  <button
-                    className="secondary-button"
-                    onClick={() => handleReject(item.id)}
-                  >
-                    Reject
-                  </button>
-                </div>
-              ) : null}
-            </article>
-          ))
+          <DataTable
+            data={filteredRows}
+            emptyMessage="Belum ada data peminjaman ruang"
+            columns={[
+              {
+                key: "no",
+                header: "No",
+                align: "center",
+                render: (_item, index) => index + 1
+              },
+              {
+                key: "ruang",
+                header: "Ruang",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{getRuangLabel(item)}</strong>
+                    <span>{item.ruang?.type || "Ruang"}</span>
+                  </div>
+                )
+              },
+              {
+                key: "peminjam",
+                header: "Peminjam",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{getPeminjamLabel(item)}</strong>
+                    <span>{item.mahasiswa?.identifier || "-"}</span>
+                  </div>
+                )
+              },
+              {
+                key: "tanggal",
+                header: "Tanggal",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{formatDateOnly(item.tanggal)}</strong>
+                    <span>
+                      {formatDateTime(item.waktuMulai)} -{" "}
+                      {formatDateTime(item.waktuSelesai)}
+                    </span>
+                  </div>
+                )
+              },
+              {
+                key: "keperluan",
+                header: "Keperluan",
+                render: (item) => item.keperluan || "-"
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                render: (item) => <StatusBadge value={item.status} size="sm" />
+              },
+              {
+                key: "actions",
+                header: "Aksi",
+                align: "right",
+                render: (item) => (
+                  <div className="table-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => openDetailDrawer(item)}
+                    >
+                      Detail
+                    </button>
+                  </div>
+                )
+              }
+            ]}
+          />
         )}
       </section>
+
+      {drawerMode ? (
+        <div className="crud-drawer-backdrop" role="presentation">
+          <aside
+            className="crud-drawer peminjaman-drawer"
+            aria-label="Peminjaman ruang"
+          >
+            <div className="crud-drawer-head">
+              <div>
+                <p className="eyebrow">
+                  {drawerMode === "create" ? "Tambah Data" : "Detail Data"}
+                </p>
+                <h2>
+                  {drawerMode === "create"
+                    ? "Ajukan Peminjaman"
+                    : "Detail Peminjaman"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeDrawer}
+              >
+                Tutup
+              </button>
+            </div>
+
+            {pageError ? <div className="alert-error">{pageError}</div> : null}
+
+            {drawerMode === "create" ? (
+              <form className="form-stack" onSubmit={handleSubmit}>
+                <label>
+                  <span>Ruang</span>
+                  <select
+                    name="ruangId"
+                    value={form.ruangId}
+                    onChange={handleFormChange}
+                    required
+                  >
+                    <option value="">Pilih ruang</option>
+                    {ruangRows.map((ruang) => (
+                      <option key={ruang.id} value={ruang.id}>
+                        {ruang.code} — {ruang.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Tanggal</span>
+                  <input
+                    name="tanggal"
+                    type="date"
+                    value={form.tanggal}
+                    onChange={handleFormChange}
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Waktu Mulai</span>
+                  <input
+                    name="waktuMulai"
+                    type="datetime-local"
+                    value={form.waktuMulai}
+                    onChange={handleFormChange}
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Waktu Selesai</span>
+                  <input
+                    name="waktuSelesai"
+                    type="datetime-local"
+                    value={form.waktuSelesai}
+                    onChange={handleFormChange}
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Keperluan</span>
+                  <textarea
+                    name="keperluan"
+                    value={form.keperluan}
+                    onChange={handleFormChange}
+                    placeholder="Contoh: Sidang skripsi, rapat pembimbing, seminar proposal"
+                    required
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={createMutation.isPending}
+                >
+                  {createMutation.isPending
+                    ? "Mengajukan..."
+                    : "Ajukan Peminjaman"}
+                </button>
+              </form>
+            ) : selectedPeminjaman ? (
+              <div className="peminjaman-detail-stack">
+                <div className="skripsi-detail-title">
+                  <strong>{getRuangLabel(selectedPeminjaman)}</strong>
+                  <StatusBadge value={selectedPeminjaman.status} />
+                </div>
+
+                <div className="info-list">
+                  <div className="info-row">
+                    <span>Peminjam</span>
+                    <strong>{getPeminjamLabel(selectedPeminjaman)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>NPM / Identifier</span>
+                    <strong>
+                      {selectedPeminjaman.mahasiswa?.identifier || "-"}
+                    </strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Tanggal</span>
+                    <strong>{formatDateOnly(selectedPeminjaman.tanggal)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Waktu Mulai</span>
+                    <strong>{formatDateTime(selectedPeminjaman.waktuMulai)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Waktu Selesai</span>
+                    <strong>{formatDateTime(selectedPeminjaman.waktuSelesai)}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Keperluan</span>
+                    <p>{selectedPeminjaman.keperluan || "-"}</p>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Alasan / Catatan</span>
+                    <p>{selectedPeminjaman.alasan || "-"}</p>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Reviewer</span>
+                    <strong>{selectedPeminjaman.reviewedBy?.name || "-"}</strong>
+                  </div>
+
+                  <div className="info-row">
+                    <span>Reviewed At</span>
+                    <strong>{formatDateTime(selectedPeminjaman.reviewedAt)}</strong>
+                  </div>
+                </div>
+
+                {canReviewSelected ? (
+                  <div className="drawer-section">
+                    <h3>Approval Peminjaman</h3>
+
+                    <label>
+                      <span>Alasan Penolakan</span>
+                      <textarea
+                        value={alasanReject}
+                        onChange={(event) => setAlasanReject(event.target.value)}
+                        placeholder="Wajib diisi jika peminjaman ditolak"
+                      />
+                    </label>
+
+                    <div className="page-actions">
+                      <button
+                        type="button"
+                        className="primary-button"
+                        disabled={approveMutation.isPending}
+                        onClick={() =>
+                          approveMutation.mutate(selectedPeminjaman.id)
+                        }
+                      >
+                        Approve
+                      </button>
+
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={rejectMutation.isPending}
+                        onClick={handleReject}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }

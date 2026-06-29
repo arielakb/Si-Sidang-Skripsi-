@@ -1,32 +1,74 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import DataTable from "../../components/ui/DataTable";
+import PageHeader from "../../components/ui/PageHeader";
+import StatusBadge from "../../components/ui/StatusBadge";
 import {
   createPeminatan,
   createRuang,
-  getGradingScales,
   getPeminatan,
   getRuang,
   updatePeminatan,
   updateRuang
 } from "../../services/masterData";
+import type { MasterRuang, Peminatan } from "../../types/admin";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { useAuth } from "../../auth/AuthContext";
+
+type ActiveTab = "peminatan" | "ruang";
+type FormMode = "create" | "edit";
+
+const emptyPeminatanForm = {
+  slug: "",
+  name: "",
+  description: "",
+  isActive: true
+};
+
+const emptyRuangForm = {
+  code: "",
+  name: "",
+  type: "",
+  capacity: "",
+  facilities: "",
+  isActive: true
+};
 
 export default function MasterDataPage() {
   const queryClient = useQueryClient();
 
-  const [peminatanForm, setPeminatanForm] = useState({
-    slug: "",
-    name: "",
-    description: ""
-  });
+  const { hasRole } = useAuth();
+  const [activeTab, setActiveTab] = useState<ActiveTab>("peminatan");
+  const [search, setSearch] = useState("");
+  const [formMode, setFormMode] = useState<FormMode>("create");
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const [ruangForm, setRuangForm] = useState({
-    code: "",
-    name: "",
-    type: "",
-    capacity: "",
-    facilities: ""
-  });
+  const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [editingPeminatanId, setEditingPeminatanId] = useState("");
+  const [peminatanForm, setPeminatanForm] = useState(emptyPeminatanForm);
+
+  const [editingRuangId, setEditingRuangId] = useState("");
+  const [ruangForm, setRuangForm] = useState(emptyRuangForm);
+
+  const canAccessMasterData = hasRole([
+    "admin",
+    "dosen_koordinator",
+    "ketua_prodi"
+  ]);
+
+  if (!canAccessMasterData) {
+    return (
+      <section className="page-stack">
+        <div className="alert-error">
+          Anda tidak memiliki akses ke halaman Master Data.
+        </div>
+      </section>
+    );
+  }
+
 
   const peminatanQuery = useQuery({
     queryKey: ["peminatan"],
@@ -38,292 +80,640 @@ export default function MasterDataPage() {
     queryFn: getRuang
   });
 
-  const gradingQuery = useQuery({
-    queryKey: ["grading-scales"],
-    queryFn: getGradingScales
-  });
+  const peminatanRows = useMemo(() => {
+    const keyword = search.toLowerCase();
 
-  const createPeminatanMutation = useMutation({
-    mutationFn: createPeminatan,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["peminatan"] });
-      setPeminatanForm({
-        slug: "",
-        name: "",
-        description: ""
-      });
+    return (peminatanQuery.data ?? []).filter((item) =>
+      `${item.slug} ${item.name} ${item.description ?? ""}`
+        .toLowerCase()
+        .includes(keyword)
+    );
+  }, [peminatanQuery.data, search]);
+
+  const ruangRows = useMemo(() => {
+    const keyword = search.toLowerCase();
+
+    return (ruangQuery.data ?? []).filter((item) =>
+      `${item.code} ${item.name} ${item.type ?? ""} ${item.facilities ?? ""}`
+        .toLowerCase()
+        .includes(keyword)
+    );
+  }, [ruangQuery.data, search]);
+
+  const savePeminatanMutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        slug: peminatanForm.slug.trim(),
+        name: peminatanForm.name.trim(),
+        description: peminatanForm.description.trim() || undefined,
+        isActive: peminatanForm.isActive
+      };
+
+      if (editingPeminatanId) {
+        return updatePeminatan(editingPeminatanId, payload);
+      }
+
+      return createPeminatan(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["peminatan"] });
+
+      closeForm();
+      setSuccessMessage(
+        formMode === "edit"
+          ? "Peminatan berhasil diperbarui."
+          : "Peminatan berhasil ditambahkan."
+      );
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(getApiErrorMessage(error, "Gagal menyimpan peminatan."));
     }
   });
 
-  const createRuangMutation = useMutation({
-    mutationFn: createRuang,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ruang"] });
-      setRuangForm({
-        code: "",
-        name: "",
-        type: "",
-        capacity: "",
-        facilities: ""
-      });
+  const saveRuangMutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        code: ruangForm.code.trim(),
+        name: ruangForm.name.trim(),
+        type: ruangForm.type.trim() || undefined,
+        capacity: ruangForm.capacity ? Number(ruangForm.capacity) : undefined,
+        facilities: ruangForm.facilities.trim() || undefined,
+        isActive: ruangForm.isActive
+      };
+
+      if (editingRuangId) {
+        return updateRuang(editingRuangId, payload);
+      }
+
+      return createRuang(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ruang"] });
+
+      closeForm();
+      setSuccessMessage(
+        formMode === "edit"
+          ? "Ruang berhasil diperbarui."
+          : "Ruang berhasil ditambahkan."
+      );
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(getApiErrorMessage(error, "Gagal menyimpan ruang."));
     }
   });
 
-  const togglePeminatanMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      updatePeminatan(id, { isActive }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["peminatan"] });
+  const togglePeminatanStatusMutation = useMutation({
+    mutationFn: (item: Peminatan) =>
+      updatePeminatan(item.id, {
+        slug: item.slug,
+        name: item.name,
+        description: item.description ?? undefined,
+        isActive: !item.isActive
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["peminatan"] });
+      setSuccessMessage("Status peminatan berhasil diperbarui.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(getApiErrorMessage(error, "Gagal mengubah status peminatan."));
     }
   });
 
-  const toggleRuangMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      updateRuang(id, { isActive }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ruang"] });
+  const toggleRuangStatusMutation = useMutation({
+    mutationFn: (item: MasterRuang) =>
+      updateRuang(item.id, {
+        code: item.code,
+        name: item.name,
+        type: item.type ?? undefined,
+        capacity: item.capacity ?? undefined,
+        facilities: item.facilities ?? undefined,
+        isActive: !item.isActive
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ruang"] });
+      setSuccessMessage("Status ruang berhasil diperbarui.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(getApiErrorMessage(error, "Gagal mengubah status ruang."));
     }
   });
 
-  function handleCreatePeminatan(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    createPeminatanMutation.mutate({
-      slug: peminatanForm.slug,
-      name: peminatanForm.name,
-      description: peminatanForm.description || undefined
-    });
+  function resetMessages() {
+    setFormError("");
+    setSuccessMessage("");
   }
 
-  function handleCreateRuang(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    createRuangMutation.mutate({
-      code: ruangForm.code,
-      name: ruangForm.name,
-      type: ruangForm.type || undefined,
-      capacity: ruangForm.capacity ? Number(ruangForm.capacity) : undefined,
-      facilities: ruangForm.facilities || undefined
-    });
+  function openCreateForm() {
+    resetMessages();
+    setFormMode("create");
+    setEditingPeminatanId("");
+    setEditingRuangId("");
+    setPeminatanForm(emptyPeminatanForm);
+    setRuangForm(emptyRuangForm);
+    setIsFormOpen(true);
   }
+
+  function closeForm() {
+    setIsFormOpen(false);
+    setFormError("");
+    setEditingPeminatanId("");
+    setEditingRuangId("");
+    setPeminatanForm(emptyPeminatanForm);
+    setRuangForm(emptyRuangForm);
+  }
+
+  function handleEditPeminatan(item: Peminatan) {
+    resetMessages();
+    setActiveTab("peminatan");
+    setFormMode("edit");
+    setEditingPeminatanId(item.id);
+    setPeminatanForm({
+      slug: item.slug,
+      name: item.name,
+      description: item.description ?? "",
+      isActive: item.isActive
+    });
+    setIsFormOpen(true);
+  }
+
+  function handleEditRuang(item: MasterRuang) {
+    resetMessages();
+    setActiveTab("ruang");
+    setFormMode("edit");
+    setEditingRuangId(item.id);
+    setRuangForm({
+      code: item.code,
+      name: item.name,
+      type: item.type ?? "",
+      capacity: item.capacity ? String(item.capacity) : "",
+      facilities: item.facilities ?? "",
+      isActive: item.isActive
+    });
+    setIsFormOpen(true);
+  }
+
+  function handleSubmitPeminatan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    resetMessages();
+
+    if (!peminatanForm.slug.trim() || !peminatanForm.name.trim()) {
+      setFormError("Slug dan nama peminatan wajib diisi.");
+      return;
+    }
+
+    savePeminatanMutation.mutate();
+  }
+
+  function handleSubmitRuang(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    resetMessages();
+
+    if (!ruangForm.code.trim() || !ruangForm.name.trim()) {
+      setFormError("Kode dan nama ruang wajib diisi.");
+      return;
+    }
+
+    if (ruangForm.capacity && Number(ruangForm.capacity) < 1) {
+      setFormError("Kapasitas ruang harus lebih dari 0.");
+      return;
+    }
+
+    saveRuangMutation.mutate();
+  }
+
+  const isLoading = peminatanQuery.isLoading || ruangQuery.isLoading;
 
   return (
     <section className="page-stack">
-      <div>
-        <p className="eyebrow">Master Data</p>
-        <h1>Master Data Sisidang</h1>
-        <p className="muted">
-          Kelola peminatan, ruang sidang, dan referensi grading.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Master Data"
+        title="Master Data Program Studi"
+        description="Kelola data peminatan dan ruang Program Studi Teknik Informatika Universitas Pancasila."
+      />
 
-      <section className="two-column">
-        <form className="card form-stack" onSubmit={handleCreatePeminatan}>
-          <h2>Tambah Peminatan</h2>
+      <section className="master-tabs">
+        <button
+          type="button"
+          className={activeTab === "peminatan" ? "master-tab active" : "master-tab"}
+          onClick={() => {
+            setActiveTab("peminatan");
+            resetMessages();
+          }}
+        >
+          Peminatan
+        </button>
 
-          <label>
-            <span>Slug</span>
-            <input
-              value={peminatanForm.slug}
-              onChange={(event) =>
-                setPeminatanForm((current) => ({
-                  ...current,
-                  slug: event.target.value
-                }))
-              }
-              placeholder="ai"
-              required
-            />
-          </label>
-
-          <label>
-            <span>Nama</span>
-            <input
-              value={peminatanForm.name}
-              onChange={(event) =>
-                setPeminatanForm((current) => ({
-                  ...current,
-                  name: event.target.value
-                }))
-              }
-              placeholder="Artificial Intelligence"
-              required
-            />
-          </label>
-
-          <label>
-            <span>Deskripsi</span>
-            <textarea
-              value={peminatanForm.description}
-              onChange={(event) =>
-                setPeminatanForm((current) => ({
-                  ...current,
-                  description: event.target.value
-                }))
-              }
-              placeholder="Deskripsi peminatan"
-            />
-          </label>
-
-          <button className="primary-button" type="submit">
-            Simpan Peminatan
-          </button>
-        </form>
-
-        <form className="card form-stack" onSubmit={handleCreateRuang}>
-          <h2>Tambah Ruang</h2>
-
-          <label>
-            <span>Kode</span>
-            <input
-              value={ruangForm.code}
-              onChange={(event) =>
-                setRuangForm((current) => ({
-                  ...current,
-                  code: event.target.value
-                }))
-              }
-              placeholder="R-102"
-              required
-            />
-          </label>
-
-          <label>
-            <span>Nama</span>
-            <input
-              value={ruangForm.name}
-              onChange={(event) =>
-                setRuangForm((current) => ({
-                  ...current,
-                  name: event.target.value
-                }))
-              }
-              placeholder="Ruang Sidang 102"
-              required
-            />
-          </label>
-
-          <label>
-            <span>Tipe</span>
-            <input
-              value={ruangForm.type}
-              onChange={(event) =>
-                setRuangForm((current) => ({
-                  ...current,
-                  type: event.target.value
-                }))
-              }
-              placeholder="Ruang Sidang"
-            />
-          </label>
-
-          <label>
-            <span>Kapasitas</span>
-            <input
-              type="number"
-              value={ruangForm.capacity}
-              onChange={(event) =>
-                setRuangForm((current) => ({
-                  ...current,
-                  capacity: event.target.value
-                }))
-              }
-              placeholder="30"
-            />
-          </label>
-
-          <label>
-            <span>Fasilitas</span>
-            <textarea
-              value={ruangForm.facilities}
-              onChange={(event) =>
-                setRuangForm((current) => ({
-                  ...current,
-                  facilities: event.target.value
-                }))
-              }
-              placeholder="Proyektor, AC, whiteboard"
-            />
-          </label>
-
-          <button className="primary-button" type="submit">
-            Simpan Ruang
-          </button>
-        </form>
+        <button
+          type="button"
+          className={activeTab === "ruang" ? "master-tab active" : "master-tab"}
+          onClick={() => {
+            setActiveTab("ruang");
+            resetMessages();
+          }}
+        >
+          Ruang
+        </button>
       </section>
 
-      <section className="two-column">
-        <div className="list-card">
-          <h2>Daftar Peminatan</h2>
+      {successMessage ? (
+        <div className="state-card success">{successMessage}</div>
+      ) : null}
 
-          {(peminatanQuery.data ?? []).map((item) => (
-            <article key={item.id} className="list-item">
-              <div>
-                <strong>{item.name}</strong>
-                <p className="muted">
-                  {item.slug} • {item.description || "-"}
-                </p>
-              </div>
+      {formError && !isFormOpen ? (
+        <div className="alert-error">{formError}</div>
+      ) : null}
 
-              <button
-                className="secondary-button"
-                onClick={() =>
-                  togglePeminatanMutation.mutate({
-                    id: item.id,
-                    isActive: !item.isActive
-                  })
-                }
-              >
-                {item.isActive ? "Nonaktifkan" : "Aktifkan"}
-              </button>
-            </article>
-          ))}
+      <section className="list-card master-list-card">
+        <div className="table-toolbar master-table-toolbar">
+          <div>
+            <h2>
+              {activeTab === "peminatan" ? "Daftar Peminatan" : "Daftar Ruang"}
+            </h2>
+            <p className="muted">
+              {activeTab === "peminatan"
+                ? "List peminatan yang tersedia untuk mahasiswa."
+                : "List ruang untuk peminjaman dan penjadwalan sidang."}
+            </p>
+          </div>
+
+          <div className="master-toolbar-actions">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={
+                activeTab === "peminatan" ? "Cari peminatan..." : "Cari ruang..."
+              }
+            />
+
+            <button type="button" className="primary-button" onClick={openCreateForm}>
+              {activeTab === "peminatan" ? "Tambah Peminatan" : "Tambah Ruang"}
+            </button>
+          </div>
         </div>
 
-        <div className="list-card">
-          <h2>Daftar Ruang</h2>
-
-          {(ruangQuery.data ?? []).map((item) => (
-            <article key={item.id} className="list-item">
-              <div>
-                <strong>{item.name}</strong>
-                <p className="muted">
-                  {item.code} • {item.type || "-"} • Kapasitas{" "}
-                  {item.capacity || "-"}
-                </p>
-              </div>
-
-              <button
-                className="secondary-button"
-                onClick={() =>
-                  toggleRuangMutation.mutate({
-                    id: item.id,
-                    isActive: !item.isActive
-                  })
-                }
-              >
-                {item.isActive ? "Nonaktifkan" : "Aktifkan"}
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <div className="list-card">
-        <h2>Grading Scale</h2>
-
-        {(gradingQuery.data ?? []).map((item) => (
-          <article key={item.id} className="list-item">
+        {isLoading ? (
+          <div className="empty-state">
             <div>
-              <strong>{item.letter}</strong>
-              <p className="muted">
-                {item.minScore} - {item.maxScore}
-              </p>
+              <strong>Memuat data...</strong>
+              <p>Mohon tunggu sebentar.</p>
             </div>
-            <span>{item.isActive ? "Aktif" : "Nonaktif"}</span>
-          </article>
-        ))}
-      </div>
+          </div>
+        ) : activeTab === "peminatan" ? (
+          <DataTable
+            data={peminatanRows}
+            emptyMessage="Belum ada data peminatan"
+            columns={[
+              {
+                key: "no",
+                header: "No",
+                align: "center",
+                render: (_item, index) => index + 1
+              },
+              {
+                key: "slug",
+                header: "Slug",
+                render: (item) => <strong>{item.slug}</strong>
+              },
+              {
+                key: "name",
+                header: "Nama Peminatan",
+                render: (item) => item.name
+              },
+              {
+                key: "description",
+                header: "Deskripsi",
+                render: (item) => item.description || "-"
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                render: (item) => (
+                  <StatusBadge
+                    value={item.isActive ? "ACTIVE" : "INACTIVE"}
+                    size="sm"
+                  />
+                )
+              },
+              {
+                key: "actions",
+                header: "Aksi",
+                align: "right",
+                render: (item) => (
+                  <div className="table-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => handleEditPeminatan(item)}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      className={item.isActive ? "danger-button" : "secondary-button"}
+                      onClick={() => togglePeminatanStatusMutation.mutate(item)}
+                    >
+                      {item.isActive ? "Nonaktifkan" : "Aktifkan"}
+                    </button>
+                  </div>
+                )
+              }
+            ]}
+          />
+        ) : (
+          <DataTable
+            data={ruangRows}
+            emptyMessage="Belum ada data ruang"
+            columns={[
+              {
+                key: "no",
+                header: "No",
+                align: "center",
+                render: (_item, index) => index + 1
+              },
+              {
+                key: "code",
+                header: "Kode",
+                render: (item) => <strong>{item.code}</strong>
+              },
+              {
+                key: "name",
+                header: "Nama Ruang",
+                render: (item) => item.name
+              },
+              {
+                key: "type",
+                header: "Tipe",
+                render: (item) => item.type || "-"
+              },
+              {
+                key: "capacity",
+                header: "Kapasitas",
+                align: "center",
+                render: (item) => item.capacity || "-"
+              },
+              {
+                key: "facilities",
+                header: "Fasilitas",
+                render: (item) => item.facilities || "-"
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                render: (item) => (
+                  <StatusBadge
+                    value={item.isActive ? "ACTIVE" : "INACTIVE"}
+                    size="sm"
+                  />
+                )
+              },
+              {
+                key: "actions",
+                header: "Aksi",
+                align: "right",
+                render: (item) => (
+                  <div className="table-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => handleEditRuang(item)}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      className={item.isActive ? "danger-button" : "secondary-button"}
+                      onClick={() => toggleRuangStatusMutation.mutate(item)}
+                    >
+                      {item.isActive ? "Nonaktifkan" : "Aktifkan"}
+                    </button>
+                  </div>
+                )
+              }
+            ]}
+          />
+        )}
+      </section>
+
+      {isFormOpen ? (
+        <div className="crud-drawer-backdrop" role="presentation">
+          <aside className="crud-drawer" aria-label="Form master data">
+            <div className="crud-drawer-head">
+              <div>
+                <p className="eyebrow">
+                  {formMode === "edit" ? "Edit Data" : "Tambah Data"}
+                </p>
+                <h2>
+                  {activeTab === "peminatan"
+                    ? formMode === "edit"
+                      ? "Edit Peminatan"
+                      : "Tambah Peminatan"
+                    : formMode === "edit"
+                      ? "Edit Ruang"
+                      : "Tambah Ruang"}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeForm}
+              >
+                Tutup
+              </button>
+            </div>
+
+            {formError ? <div className="alert-error">{formError}</div> : null}
+
+            {activeTab === "peminatan" ? (
+              <form className="form-stack" onSubmit={handleSubmitPeminatan}>
+                <label>
+                  <span>Slug</span>
+                  <input
+                    value={peminatanForm.slug}
+                    onChange={(event) =>
+                      setPeminatanForm((current) => ({
+                        ...current,
+                        slug: event.target.value
+                      }))
+                    }
+                    placeholder="contoh: ai"
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Nama Peminatan</span>
+                  <input
+                    value={peminatanForm.name}
+                    onChange={(event) =>
+                      setPeminatanForm((current) => ({
+                        ...current,
+                        name: event.target.value
+                      }))
+                    }
+                    placeholder="Artificial Intelligence"
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Status</span>
+                  <select
+                    value={peminatanForm.isActive ? "ACTIVE" : "INACTIVE"}
+                    onChange={(event) =>
+                      setPeminatanForm((current) => ({
+                        ...current,
+                        isActive: event.target.value === "ACTIVE"
+                      }))
+                    }
+                  >
+                    <option value="ACTIVE">Aktif</option>
+                    <option value="INACTIVE">Nonaktif</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Deskripsi</span>
+                  <textarea
+                    value={peminatanForm.description}
+                    onChange={(event) =>
+                      setPeminatanForm((current) => ({
+                        ...current,
+                        description: event.target.value
+                      }))
+                    }
+                    placeholder="Deskripsi singkat peminatan"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={savePeminatanMutation.isPending}
+                >
+                  {savePeminatanMutation.isPending
+                    ? "Menyimpan..."
+                    : formMode === "edit"
+                      ? "Simpan Perubahan"
+                      : "Tambah Peminatan"}
+                </button>
+              </form>
+            ) : (
+              <form className="form-stack" onSubmit={handleSubmitRuang}>
+                <label>
+                  <span>Kode Ruang</span>
+                  <input
+                    value={ruangForm.code}
+                    onChange={(event) =>
+                      setRuangForm((current) => ({
+                        ...current,
+                        code: event.target.value
+                      }))
+                    }
+                    placeholder="R-401"
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Nama Ruang</span>
+                  <input
+                    value={ruangForm.name}
+                    onChange={(event) =>
+                      setRuangForm((current) => ({
+                        ...current,
+                        name: event.target.value
+                      }))
+                    }
+                    placeholder="Laboratorium Informatika"
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Tipe</span>
+                  <input
+                    value={ruangForm.type}
+                    onChange={(event) =>
+                      setRuangForm((current) => ({
+                        ...current,
+                        type: event.target.value
+                      }))
+                    }
+                    placeholder="Lab / Kelas / Sidang"
+                  />
+                </label>
+
+                <label>
+                  <span>Kapasitas</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={ruangForm.capacity}
+                    onChange={(event) =>
+                      setRuangForm((current) => ({
+                        ...current,
+                        capacity: event.target.value
+                      }))
+                    }
+                    placeholder="30"
+                  />
+                </label>
+
+                <label>
+                  <span>Status</span>
+                  <select
+                    value={ruangForm.isActive ? "ACTIVE" : "INACTIVE"}
+                    onChange={(event) =>
+                      setRuangForm((current) => ({
+                        ...current,
+                        isActive: event.target.value === "ACTIVE"
+                      }))
+                    }
+                  >
+                    <option value="ACTIVE">Aktif</option>
+                    <option value="INACTIVE">Nonaktif</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span>Fasilitas</span>
+                  <textarea
+                    value={ruangForm.facilities}
+                    onChange={(event) =>
+                      setRuangForm((current) => ({
+                        ...current,
+                        facilities: event.target.value
+                      }))
+                    }
+                    placeholder="Proyektor, AC, papan tulis, internet"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={saveRuangMutation.isPending}
+                >
+                  {saveRuangMutation.isPending
+                    ? "Menyimpan..."
+                    : formMode === "edit"
+                      ? "Simpan Perubahan"
+                      : "Tambah Ruang"}
+                </button>
+              </form>
+            )}
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }

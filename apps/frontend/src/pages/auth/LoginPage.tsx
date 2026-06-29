@@ -30,14 +30,17 @@ export default function LoginPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setError("");
     setIsSubmitting(true);
 
     try {
-    await login({
-      identifier,
-      password
-    });      navigate(redirectTo, { replace: true });
+      await login({
+        identifier,
+        password
+      });
+
+      navigate(redirectTo, { replace: true });
     } catch (loginError: unknown) {
       setError(
         getApiErrorMessage(
@@ -51,110 +54,108 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-visual-panel">
-        <Link to="/" className="login-brand">
-          <span>S</span>
-          <div>
-            <strong>Sisidang</strong>
-            <small>Sistem Administrasi Skripsi</small>
-          </div>
-        </Link>
+    <main className="auth-page auth-page-up">
+      <section className="auth-hero">
+        <div className="auth-brand-card">
+          <img
+            src="/logo-up.png"
+            alt="Logo Universitas Pancasila"
+            className="auth-logo"
+          />
 
-        <div className="login-hero-copy">
-          <p className="eyebrow">Universitas Pancasila</p>
-          <h1>Kelola proses skripsi dari seminar proposal sampai finalisasi.</h1>
-          <p>
-            Login untuk mengakses dashboard sesuai role: mahasiswa, dosen,
-            koordinator, ketua prodi, staf prodi, atau admin.
-          </p>
+          <div>
+            <p className="auth-eyebrow">Universitas Pancasila</p>
+            <h1>Sisidang Teknik Informatika</h1>
+            <p>
+              Sistem administrasi skripsi untuk pendaftaran seminar proposal,
+              bimbingan, jadwal sidang, nilai, revisi, dan finalisasi.
+            </p>
+          </div>
         </div>
 
-        <div className="login-feature-grid">
+        <div className="auth-feature-grid">
           <article>
-            <strong>RBAC</strong>
-            <span>Menu sesuai role</span>
+            <strong>Terstruktur</strong>
+            <span>Alur skripsi dari proposal sampai finalisasi.</span>
           </article>
 
           <article>
-            <strong>Workflow</strong>
-            <span>End-to-end skripsi</span>
+            <strong>Responsif</strong>
+            <span>Nyaman dipakai di laptop, tablet, dan ponsel.</span>
           </article>
 
           <article>
-            <strong>Audit</strong>
-            <span>Aktivitas tercatat</span>
+            <strong>Terpantau</strong>
+            <span>Progress bimbingan dan status sidang lebih jelas.</span>
           </article>
         </div>
       </section>
 
-      <section className="login-form-panel">
-        <div className="auth-card login-card">
+      <section className="auth-panel">
+        <div className="auth-panel-head">
+          <img
+            src="/logo-up.png"
+            alt="Logo Universitas Pancasila"
+            className="auth-panel-logo"
+          />
+
           <div>
-            <p className="eyebrow">Masuk Sistem</p>
-            <h2>Login Sisidang</h2>
+            <p className="eyebrow">Masuk Aplikasi</p>
+            <h2>Selamat Datang</h2>
             <p className="muted">
-              Gunakan identifier/NPM/NIDN dan password yang sudah terdaftar.
+              Gunakan akun mahasiswa, dosen, atau admin yang sudah terdaftar.
             </p>
           </div>
+        </div>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label>
+            <span>Identifier / NPM / NIDN / Email</span>
+            <input
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder="Contoh: admin atau 4519210110"
+              autoComplete="username"
+              required
+            />
+          </label>
+
+          <label>
+            <span>Password</span>
+            <div className="password-field">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Masukkan password"
+                autoComplete="current-password"
+                required
+              />
+
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+              >
+                {showPassword ? "Sembunyikan" : "Lihat"}
+              </button>
+            </div>
+          </label>
 
           {error ? <div className="alert-error">{error}</div> : null}
 
-          <form className="form-stack" onSubmit={handleSubmit}>
-            <label>
-              <span>Identifier</span>
-              <input
-                value={identifier}
-                onChange={(event) => setIdentifier(event.target.value)}
-                placeholder="admin / NPM / NIDN"
-                autoComplete="username"
-                required
-              />
-            </label>
+          <button
+            type="submit"
+            className="primary-button auth-submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Memproses..." : "Masuk Dashboard"}
+          </button>
+        </form>
 
-            <label>
-              <span>Password</span>
-              <div className="password-field">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Masukkan password"
-                  autoComplete="current-password"
-                  required
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((current) => !current)}
-                >
-                  {showPassword ? "Sembunyikan" : "Lihat"}
-                </button>
-              </div>
-            </label>
-
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Memproses..." : "Login"}
-            </button>
-          </form>
-
-          <div className="demo-login-box">
-            <strong>Akun demo cepat</strong>
-            <p>
-              Admin: <code>admin</code> / <code>ChangeMe123!</code>
-            </p>
-            <p>
-              Mahasiswa: <code>4519210110</code> / <code>Password123!</code>
-            </p>
-          </div>
-
-          <Link to="/" className="text-link">
-            Kembali ke Dashboard Publik
-          </Link>
+        <div className="auth-footer-note">
+          <span>Ingin melihat jadwal sidang?</span>
+          <Link to="/">Buka Dashboard Publik</Link>
         </div>
       </section>
     </main>

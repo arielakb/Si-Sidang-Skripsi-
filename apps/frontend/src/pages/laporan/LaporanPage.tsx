@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import DataTable from "../../components/ui/DataTable";
+import EmptyState from "../../components/ui/EmptyState";
+import MetricCard from "../../components/ui/MetricCard";
+import PageHeader from "../../components/ui/PageHeader";
+import StatusBadge from "../../components/ui/StatusBadge";
 import {
   downloadLaporanSkripsiExcel,
   downloadLaporanSkripsiPdf,
   getLaporanSkripsi,
   getLaporanSummary,
-  type LaporanFilter
+  type LaporanFilter,
+  type LaporanSkripsiRow
 } from "../../services/laporan";
 import { getPeminatan } from "../../services/masterData";
+
+type DrawerMode = "detail" | null;
 
 const statusOptions = [
   "MENUNGGU_BERKAS",
@@ -29,17 +37,55 @@ const tahapOptions = [
   "FINAL"
 ];
 
+const initialFilters: LaporanFilter = {
+  status: "",
+  tahap: "",
+  peminatanId: "",
+  search: "",
+  startDate: "",
+  endDate: "",
+  page: 1,
+  limit: 20
+};
+
+function cleanFilters(filters: LaporanFilter): LaporanFilter {
+  return {
+    ...filters,
+    status: filters.status || undefined,
+    tahap: filters.tahap || undefined,
+    peminatanId: filters.peminatanId || undefined,
+    search: filters.search || undefined,
+    startDate: filters.startDate || undefined,
+    endDate: filters.endDate || undefined
+  };
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function getCardValue(cards: Record<string, number> | undefined, keys: string[]) {
+  if (!cards) return 0;
+
+  for (const key of keys) {
+    if (typeof cards[key] === "number") return cards[key];
+  }
+
+  return 0;
+}
+
 export default function LaporanPage() {
-  const [filters, setFilters] = useState<LaporanFilter>({
-    status: "",
-    tahap: "",
-    peminatanId: "",
-    search: "",
-    startDate: "",
-    endDate: "",
-    page: 1,
-    limit: 20
-  });
+  const [filters, setFilters] = useState<LaporanFilter>(initialFilters);
+  const [isExporting, setIsExporting] = useState("");
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
+  const [selectedRow, setSelectedRow] = useState<LaporanSkripsiRow | null>(null);
+
+  const apiFilters = useMemo(() => cleanFilters(filters), [filters]);
 
   const summaryQuery = useQuery({
     queryKey: ["laporan-summary"],
@@ -52,26 +98,52 @@ export default function LaporanPage() {
   });
 
   const laporanQuery = useQuery({
-    queryKey: ["laporan-skripsi", filters],
-    queryFn: () =>
-      getLaporanSkripsi({
-        ...filters,
-        status: filters.status || undefined,
-        tahap: filters.tahap || undefined,
-        peminatanId: filters.peminatanId || undefined,
-        search: filters.search || undefined,
-        startDate: filters.startDate || undefined,
-        endDate: filters.endDate || undefined
-      })
+    queryKey: ["laporan-skripsi", apiFilters],
+    queryFn: () => getLaporanSkripsi(apiFilters)
   });
 
-  const [isExporting, setIsExporting] = useState("");
+  const summary = summaryQuery.data;
+  const rows = laporanQuery.data?.data ?? [];
+  const meta = laporanQuery.data?.meta;
+
+  const totalSkripsi =
+    getCardValue(summary?.cards, ["total", "totalSkripsi", "skripsi"]) ||
+    (summary?.byStatus ?? []).reduce((total, item) => total + item.count, 0);
+
+  const totalSelesai =
+    summary?.byStatus.find((item) => item.status === "SELESAI")?.count ?? 0;
+
+  const totalRevisi =
+    summary?.byStatus.find((item) => item.status === "MENUNGGU_REVISI")?.count ??
+    0;
+
+  const totalFinalisasi =
+    (summary?.byStatus.find((item) => item.status === "MENUNGGU_FINAL")?.count ??
+      0) +
+    (summary?.byStatus.find((item) => item.status === "MENUNGGU_PENGESAHAN")
+      ?.count ?? 0);
+
+  function updateFilter<K extends keyof LaporanFilter>(
+    key: K,
+    value: LaporanFilter[K]
+  ) {
+    setFilters((current) => {
+      const next = {
+        ...current,
+        [key]: value
+      } as LaporanFilter;
+
+      next.page = key === "page" ? Number(value ?? 1) : 1;
+
+      return next;
+    });
+  }
 
   async function handleExportExcel() {
     setIsExporting("excel");
 
     try {
-      await downloadLaporanSkripsiExcel(filters);
+      await downloadLaporanSkripsiExcel(apiFilters);
     } finally {
       setIsExporting("");
     }
@@ -81,246 +153,418 @@ export default function LaporanPage() {
     setIsExporting("pdf");
 
     try {
-      await downloadLaporanSkripsiPdf(filters);
+      await downloadLaporanSkripsiPdf(apiFilters);
     } finally {
       setIsExporting("");
     }
   }
 
-  const summary = summaryQuery.data;
-  const rows = laporanQuery.data?.data ?? [];
-  const meta = laporanQuery.data?.meta;
+  function openDetailDrawer(row: LaporanSkripsiRow) {
+    setSelectedRow(row);
+    setDrawerMode("detail");
+  }
+
+  function closeDrawer() {
+    setSelectedRow(null);
+    setDrawerMode(null);
+  }
 
   return (
     <section className="page-stack">
-      <div>
-        <p className="eyebrow">Laporan</p>
-        <h1>Analytics & Laporan Skripsi</h1>
-        <p className="muted">
-          Pantau progres skripsi, distribusi status, dan export laporan akademik.
-        </p>
+      <PageHeader
+        eyebrow="Laporan"
+        title="Analytics & Laporan Skripsi"
+        description="Pantau progres skripsi, distribusi status, dan export laporan akademik."
+      />
+
+      <div className="metric-grid laporan-overview-grid">
+        <MetricCard
+          label="Total Skripsi"
+          value={totalSkripsi}
+          description="Total data skripsi tercatat"
+        />
+
+        <MetricCard
+          label="Selesai"
+          value={totalSelesai}
+          description="Skripsi yang sudah selesai"
+        />
+
+        <MetricCard
+          label="Menunggu Revisi"
+          value={totalRevisi}
+          description="Skripsi yang masih revisi"
+        />
+
+        <MetricCard
+          label="Finalisasi"
+          value={totalFinalisasi}
+          description="Menunggu final/pengesahan"
+        />
       </div>
 
       {summary ? (
-        <>
-          <section className="stats-grid">
-            {Object.entries(summary.cards).map(([key, value]) => (
-              <div key={key} className="stat-card">
-                <small>{key}</small>
-                <strong>{value}</strong>
-              </div>
-            ))}
-          </section>
+        <section className="laporan-distribution-grid">
+          <div className="list-card laporan-mini-card">
+            <h2>Distribusi Status</h2>
 
-          <section className="two-column">
-            <div className="list-card">
-              <h2>Distribusi Status</h2>
+            <div className="mini-report-list">
               {summary.byStatus.map((item) => (
-                <article key={item.status} className="list-item">
-                  <strong>{item.status}</strong>
-                  <span>{item.count}</span>
-                </article>
+                <div key={item.status} className="mini-report-row">
+                  <StatusBadge value={item.status} size="sm" />
+                  <strong>{item.count}</strong>
+                </div>
               ))}
             </div>
+          </div>
 
-            <div className="list-card">
-              <h2>Distribusi Tahap</h2>
+          <div className="list-card laporan-mini-card">
+            <h2>Distribusi Tahap</h2>
+
+            <div className="mini-report-list">
               {summary.byTahap.map((item) => (
-                <article key={item.tahap} className="list-item">
-                  <strong>{item.tahap}</strong>
-                  <span>{item.count}</span>
-                </article>
+                <div key={item.tahap} className="mini-report-row">
+                  <StatusBadge value={item.tahap} size="sm" />
+                  <strong>{item.count}</strong>
+                </div>
               ))}
             </div>
-          </section>
-        </>
+          </div>
+        </section>
       ) : null}
 
-      <section className="card form-grid">
-        <label>
-          <span>Status</span>
-          <select
-            value={filters.status}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                status: event.target.value,
-                page: 1
-              }))
-            }
-          >
-            <option value="">Semua status</option>
-            {statusOptions.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Tahap</span>
-          <select
-            value={filters.tahap}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                tahap: event.target.value,
-                page: 1
-              }))
-            }
-          >
-            <option value="">Semua tahap</option>
-            {tahapOptions.map((tahap) => (
-              <option key={tahap} value={tahap}>
-                {tahap}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Peminatan</span>
-          <select
-            value={filters.peminatanId}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                peminatanId: event.target.value,
-                page: 1
-              }))
-            }
-          >
-            <option value="">Semua peminatan</option>
-            {(peminatanQuery.data ?? []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Search</span>
-          <input
-            value={filters.search}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                search: event.target.value,
-                page: 1
-              }))
-            }
-            placeholder="Nama/NPM/judul"
-          />
-        </label>
-
-        <label>
-          <span>Start Date</span>
-          <input
-            type="date"
-            value={filters.startDate}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                startDate: event.target.value,
-                page: 1
-              }))
-            }
-          />
-        </label>
-
-        <label>
-          <span>End Date</span>
-          <input
-            type="date"
-            value={filters.endDate}
-            onChange={(event) =>
-              setFilters((current) => ({
-                ...current,
-                endDate: event.target.value,
-                page: 1
-              }))
-            }
-          />
-        </label>
-      </section>
-
-      <section className="page-header-row">
-        <div>
-          <h2>Data Skripsi</h2>
-          <p className="muted">
-            Total: {meta?.total ?? 0} data • Halaman {meta?.page ?? 1}/
-            {meta?.totalPages ?? 1}
-          </p>
-        </div>
-
-        <div className="row-inline">
-          <button
-            className="secondary-button"
-            onClick={handleExportExcel}
-            disabled={Boolean(isExporting)}
-          >
-            {isExporting === "excel" ? "Exporting..." : "Export Excel"}
-          </button>
-
-          <button
-            className="secondary-button"
-            onClick={handleExportPdf}
-            disabled={Boolean(isExporting)}
-          >
-            {isExporting === "pdf" ? "Exporting..." : "Export PDF"}
-          </button>
-        </div>
-      </section>
-
-      <section className="table-card">
-        {laporanQuery.isLoading ? (
-          <p>Memuat laporan...</p>
-        ) : rows.length === 0 ? (
-          <p>Belum ada data sesuai filter.</p>
-        ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>No</th>
-                  <th>NPM</th>
-                  <th>Mahasiswa</th>
-                  <th>Judul</th>
-                  <th>Peminatan</th>
-                  <th>Tahap</th>
-                  <th>Status</th>
-                  <th>Pembimbing</th>
-                  <th>Bimbingan</th>
-                  <th>Nilai</th>
-                  <th>Progress</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {rows.map((item) => (
-                  <tr key={`${item.npm}-${item.no}`}>
-                    <td>{item.no}</td>
-                    <td>{item.npm}</td>
-                    <td>{item.mahasiswa}</td>
-                    <td>{item.judul}</td>
-                    <td>{item.peminatan}</td>
-                    <td>{item.tahap}</td>
-                    <td>{item.status}</td>
-                    <td>{item.pembimbing}</td>
-                    <td>{item.bimbinganValid}/8</td>
-                    <td>
-                      {item.nilaiAkhir} / {item.nilaiHuruf}
-                    </td>
-                    <td>{item.progress}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section className="list-card laporan-table-card">
+        <div className="table-toolbar master-table-toolbar">
+          <div>
+            <h2>Data Skripsi</h2>
+            <p className="muted">
+              Total: {meta?.total ?? 0} data • Halaman {meta?.page ?? 1}/
+              {meta?.totalPages ?? 1}
+            </p>
           </div>
+
+          <div className="master-toolbar-actions">
+            <input
+              value={filters.search ?? ""}
+              onChange={(event) => updateFilter("search", event.target.value)}
+              placeholder="Cari nama, NPM, atau judul..."
+            />
+
+            <select
+              value={filters.status ?? ""}
+              onChange={(event) => updateFilter("status", event.target.value)}
+            >
+              <option value="">Semua Status</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.tahap ?? ""}
+              onChange={(event) => updateFilter("tahap", event.target.value)}
+            >
+              <option value="">Semua Tahap</option>
+              {tahapOptions.map((tahap) => (
+                <option key={tahap} value={tahap}>
+                  {tahap}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.peminatanId ?? ""}
+              onChange={(event) =>
+                updateFilter("peminatanId", event.target.value)
+              }
+            >
+              <option value="">Semua Peminatan</option>
+              {(peminatanQuery.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={filters.startDate ?? ""}
+              onChange={(event) => updateFilter("startDate", event.target.value)}
+              title="Start Date"
+            />
+
+            <input
+              type="date"
+              value={filters.endDate ?? ""}
+              onChange={(event) => updateFilter("endDate", event.target.value)}
+              title="End Date"
+            />
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleExportExcel}
+              disabled={Boolean(isExporting)}
+            >
+              {isExporting === "excel" ? "Exporting..." : "Export Excel"}
+            </button>
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleExportPdf}
+              disabled={Boolean(isExporting)}
+            >
+              {isExporting === "pdf" ? "Exporting..." : "Export PDF"}
+            </button>
+          </div>
+        </div>
+
+        {laporanQuery.isLoading ? (
+          <EmptyState
+            title="Memuat laporan..."
+            description="Mohon tunggu sebentar."
+          />
+        ) : (
+          <DataTable
+            data={rows}
+            emptyMessage="Belum ada data sesuai filter"
+            columns={[
+              {
+                key: "no",
+                header: "No",
+                align: "center",
+                render: (item) => item.no
+              },
+              {
+                key: "mahasiswa",
+                header: "Mahasiswa",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{item.mahasiswa}</strong>
+                    <span>
+                      {item.npm} • {item.email || "-"}
+                    </span>
+                  </div>
+                )
+              },
+              {
+                key: "judul",
+                header: "Judul",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{item.judul || "Tanpa judul"}</strong>
+                    <span>{item.peminatan || "-"}</span>
+                  </div>
+                )
+              },
+              {
+                key: "tahap",
+                header: "Tahap",
+                align: "center",
+                render: (item) => <StatusBadge value={item.tahap} size="sm" />
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                render: (item) => <StatusBadge value={item.status} size="sm" />
+              },
+              {
+                key: "pembimbing",
+                header: "Pembimbing",
+                render: (item) => item.pembimbing || "-"
+              },
+              {
+                key: "bimbingan",
+                header: "Bimbingan",
+                align: "center",
+                render: (item) => (
+                  <div className="table-title-cell table-center-cell">
+                    <strong>{item.bimbinganValid}/8</strong>
+                    <span>{item.progress}%</span>
+                  </div>
+                )
+              },
+              {
+                key: "nilai",
+                header: "Nilai",
+                align: "center",
+                render: (item) => (
+                  <div className="score-box table-score-box">
+                    <strong>{item.nilaiAkhir || "-"}</strong>
+                    <small>{item.nilaiHuruf || "-"}</small>
+                  </div>
+                )
+              },
+              {
+                key: "actions",
+                header: "Aksi",
+                align: "right",
+                render: (item) => (
+                  <div className="table-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => openDetailDrawer(item)}
+                    >
+                      Detail
+                    </button>
+                  </div>
+                )
+              }
+            ]}
+          />
         )}
+
+        <div className="pagination-row">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={(filters.page ?? 1) <= 1}
+            onClick={() => updateFilter("page", Math.max((filters.page ?? 1) - 1, 1))}
+          >
+            Sebelumnya
+          </button>
+
+          <span>
+            Halaman {meta?.page ?? filters.page ?? 1} dari{" "}
+            {meta?.totalPages ?? 1}
+          </span>
+
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={(meta?.page ?? 1) >= (meta?.totalPages ?? 1)}
+            onClick={() => updateFilter("page", (filters.page ?? 1) + 1)}
+          >
+            Berikutnya
+          </button>
+        </div>
       </section>
+
+      {drawerMode === "detail" && selectedRow ? (
+        <div className="crud-drawer-backdrop" role="presentation">
+          <aside
+            className="crud-drawer laporan-drawer"
+            aria-label="Detail laporan skripsi"
+          >
+            <div className="crud-drawer-head">
+              <div>
+                <p className="eyebrow">Detail Laporan</p>
+                <h2>Detail Skripsi</h2>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeDrawer}
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="laporan-detail-stack">
+              <div className="skripsi-detail-title">
+                <strong>{selectedRow.judul || "Tanpa judul"}</strong>
+                <StatusBadge value={selectedRow.status} />
+              </div>
+
+              <div className="info-list">
+                <div className="info-row">
+                  <span>Mahasiswa</span>
+                  <strong>{selectedRow.mahasiswa}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>NPM</span>
+                  <strong>{selectedRow.npm}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Email</span>
+                  <strong>{selectedRow.email || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Peminatan</span>
+                  <strong>{selectedRow.peminatan || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Jenis Skripsi</span>
+                  <strong>{selectedRow.jenisSkripsi || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Tahap</span>
+                  <strong>{selectedRow.tahap || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Status</span>
+                  <strong>{selectedRow.status || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Pembimbing</span>
+                  <p>{selectedRow.pembimbing || "-"}</p>
+                </div>
+
+                <div className="info-row">
+                  <span>Penguji</span>
+                  <p>{selectedRow.penguji || "-"}</p>
+                </div>
+
+                <div className="info-row">
+                  <span>Bimbingan Valid</span>
+                  <strong>{selectedRow.bimbinganValid}/8</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Jumlah Berkas</span>
+                  <strong>{selectedRow.jumlahBerkas}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Jumlah Revisi</span>
+                  <strong>{selectedRow.jumlahRevisi}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Nilai</span>
+                  <strong>
+                    {selectedRow.nilaiAkhir || "-"} /{" "}
+                    {selectedRow.nilaiHuruf || "-"}
+                  </strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Progress</span>
+                  <strong>{selectedRow.progress}%</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Jadwal Sidang</span>
+                  <strong>{selectedRow.jadwalSidang || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Ruang</span>
+                  <strong>{selectedRow.ruang || "-"}</strong>
+                </div>
+
+                <div className="info-row">
+                  <span>Dibuat</span>
+                  <strong>{formatDate(selectedRow.createdAt)}</strong>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </section>
   );
 }
