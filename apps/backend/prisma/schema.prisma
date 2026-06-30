@@ -30,6 +30,9 @@ enum SkripsiStatus {
   MENUNGGU_FINAL
   SELESAI
   DITOLAK
+  NONAKTIF
+  DIBATALKAN
+  DIARSIPKAN
 }
 
 enum DosenSkripsiPeran {

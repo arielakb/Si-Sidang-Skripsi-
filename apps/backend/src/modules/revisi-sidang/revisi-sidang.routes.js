@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createRevisiSidang,
+  deleteRevisiSidangPermanent,
   getRevisiBySkripsi,
   reviewRevisiSidang,
   uploadRevisiSidang
@@ -38,6 +39,13 @@ router.patch(
   authenticate,
   requirePermission("revisi.approve"),
   reviewRevisiSidang
+);
+
+router.delete(
+  "/:revisiId",
+  authenticate,
+  requirePermission("revisi.delete_permanent"),
+  deleteRevisiSidangPermanent
 );
 
 export default router;

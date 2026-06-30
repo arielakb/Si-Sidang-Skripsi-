@@ -23,11 +23,19 @@ export type UpdateRuangPayload = Partial<CreateRuangPayload> & {
   isActive?: boolean;
 };
 
-export async function getPeminatan() {
+export async function getPeminatan(
+  options: { includeInactive?: boolean } = {}
+) {
   const response = await api.get<{
     success: boolean;
     data: Peminatan[];
-  }>("/master-data/peminatan");
+  }>("/master-data/peminatan", {
+    params: options.includeInactive
+      ? {
+          includeInactive: true
+        }
+      : undefined
+  });
 
   return response.data.data;
 }
@@ -45,11 +53,24 @@ export async function updatePeminatan(
   return response.data;
 }
 
-export async function getRuang() {
+export async function deletePeminatanPermanent(id: string) {
+  const response = await api.delete(`/master-data/peminatan/${id}`);
+  return response.data;
+}
+
+export async function getRuang(
+  options: { includeInactive?: boolean } = {}
+) {
   const response = await api.get<{
     success: boolean;
     data: MasterRuang[];
-  }>("/master-data/ruang");
+  }>("/master-data/ruang", {
+    params: options.includeInactive
+      ? {
+          includeInactive: true
+        }
+      : undefined
+  });
 
   return response.data.data;
 }
@@ -61,6 +82,11 @@ export async function createRuang(payload: CreateRuangPayload) {
 
 export async function updateRuang(id: string, payload: UpdateRuangPayload) {
   const response = await api.patch(`/master-data/ruang/${id}`, payload);
+  return response.data;
+}
+
+export async function deleteRuangPermanent(id: string) {
+  const response = await api.delete(`/master-data/ruang/${id}`);
   return response.data;
 }
 

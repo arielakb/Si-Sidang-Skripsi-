@@ -94,9 +94,8 @@ export default function LaporanPage() {
 
   const peminatanQuery = useQuery({
     queryKey: ["peminatan"],
-    queryFn: getPeminatan
+    queryFn: () => getPeminatan()
   });
-
   const laporanQuery = useQuery({
     queryKey: ["laporan-skripsi", apiFilters],
     queryFn: () => getLaporanSkripsi(apiFilters)

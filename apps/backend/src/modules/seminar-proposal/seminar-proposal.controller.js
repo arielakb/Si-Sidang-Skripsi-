@@ -26,6 +26,9 @@ async function syncSeminarProposalStatus(skripsiId) {
           kategori: {
             in: SEMINAR_REQUIRED_BERKAS
           }
+        },
+        orderBy: {
+          createdAt: "desc"
         }
       },
       kodeEtik: true
@@ -33,6 +36,10 @@ async function syncSeminarProposalStatus(skripsiId) {
   });
 
   if (!skripsi) return null;
+
+  if (skripsi.tahap !== "SEMINAR_PROPOSAL") {
+    return skripsi;
+  }
 
   const hasProposal = skripsi.berkas.some(
     (item) => item.kategori === "PROPOSAL"
@@ -49,21 +56,28 @@ async function syncSeminarProposalStatus(skripsiId) {
       ? "MENUNGGU_APPROVAL"
       : "MENUNGGU_BERKAS";
 
-  if (
-    ["MENUNGGU_BERKAS", "MENUNGGU_APPROVAL"].includes(skripsi.status) &&
-    skripsi.status !== nextStatus
-  ) {
-    return prisma.skripsi.update({
-      where: {
-        id: skripsiId
-      },
-      data: {
-        status: nextStatus
-      }
-    });
+  const syncableStatuses = [
+    "MENUNGGU_BERKAS",
+    "MENUNGGU_APPROVAL",
+    "MENUNGGU_REVISI"
+  ];
+
+  if (!syncableStatuses.includes(skripsi.status)) {
+    return skripsi;
   }
 
-  return skripsi;
+  if (skripsi.status === nextStatus) {
+    return skripsi;
+  }
+
+  return prisma.skripsi.update({
+    where: {
+      id: skripsiId
+    },
+    data: {
+      status: nextStatus
+    }
+  });
 }
 
 async function upsertSeminarBerkas({
@@ -498,7 +512,7 @@ export async function agreeKodeEtik(req, res, next) {
         userId: req.user.id
       },
       orderBy: {
-        createdAt: "desc"
+        agreedAt: "desc"
       }
     });
 
@@ -508,16 +522,20 @@ export async function agreeKodeEtik(req, res, next) {
         data: {
           skripsiId: skripsi.id,
           userId: req.user.id,
-          statementVersion
+          statementVersion,
+          agreedAt: new Date()
         }
       }));
 
-    await syncSeminarProposalStatus(skripsi.id);
+    const updatedSkripsi = await syncSeminarProposalStatus(skripsi.id);
 
     return res.status(existingKodeEtik ? 200 : 201).json({
       success: true,
       message: "Kode etik berhasil disetujui",
-      data: kodeEtik
+      data: {
+        kodeEtik,
+        skripsi: updatedSkripsi
+      }
     });
   } catch (error) {
     return next(error);

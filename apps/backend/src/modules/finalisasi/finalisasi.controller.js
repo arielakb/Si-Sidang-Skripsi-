@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import { prisma } from "../../config/prisma.js";
 import { createNotification } from "../../utils/notification.js";
 
@@ -9,6 +10,18 @@ function getUploadedFilePayload(file) {
     sizeBytes: BigInt(file.size),
     path: file.path
   };
+}
+
+async function removePhysicalFile(filePath) {
+  if (!filePath) return;
+
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.warn(`Gagal menghapus file fisik: ${filePath}`, error.message);
+    }
+  }
 }
 
 async function ensureOwner(skripsiId, userId) {
@@ -329,6 +342,95 @@ export async function rejectFinalSkripsi(req, res, next) {
       data: {
         alasan
       }
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deleteFinalBerkasPermanent(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const berkas = await prisma.berkas.findUnique({
+      where: { id },
+      include: {
+        skripsi: true
+      }
+    });
+
+    if (!berkas) {
+      return res.status(404).json({
+        success: false,
+        message: "Berkas finalisasi tidak ditemukan"
+      });
+    }
+
+    const allowedKategori = ["FINAL_SKRIPSI", "LEMBAR_PENGESAHAN"];
+
+    if (!allowedKategori.includes(berkas.kategori)) {
+      return res.status(400).json({
+        success: false,
+        message: "Berkas ini bukan berkas finalisasi"
+      });
+    }
+
+    if (berkas.skripsi?.status === "SELESAI") {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Berkas tidak dapat dihapus permanen karena skripsi sudah selesai."
+      });
+    }
+
+    await prisma.berkas.delete({
+      where: { id }
+    });
+
+    await removePhysicalFile(berkas.path);
+
+    return res.json({
+      success: true,
+      message: "Berkas finalisasi berhasil dihapus permanen"
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deletePengesahanPermanent(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const pengesahan = await prisma.pengesahan.findUnique({
+      where: { id },
+      include: {
+        skripsi: true
+      }
+    });
+
+    if (!pengesahan) {
+      return res.status(404).json({
+        success: false,
+        message: "Data pengesahan tidak ditemukan"
+      });
+    }
+
+    if (pengesahan.skripsi?.status === "SELESAI") {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Pengesahan tidak dapat dihapus permanen karena skripsi sudah selesai."
+      });
+    }
+
+    await prisma.pengesahan.delete({
+      where: { id }
+    });
+
+    return res.json({
+      success: true,
+      message: "Data pengesahan berhasil dihapus permanen"
     });
   } catch (error) {
     return next(error);

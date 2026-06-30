@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   createPeminatan,
   createRuang,
+  deletePeminatanPermanent,
+  deleteRuangPermanent,
   getGradingScales,
   getJenisSkripsi,
   getPeminatan,
@@ -56,6 +58,13 @@ router.patch(
   updatePeminatan
 );
 
+router.delete(
+  "/peminatan/:id",
+  authenticate,
+  requirePermission("master_data.delete_permanent"),
+  deletePeminatanPermanent
+);
+
 router.post(
   "/ruang",
   authenticate,
@@ -68,6 +77,13 @@ router.patch(
   authenticate,
   requirePermission("ruang.manage"),
   updateRuang
+);
+
+router.delete(
+  "/ruang/:id",
+  authenticate,
+  requirePermission("master_data.delete_permanent"),
+  deleteRuangPermanent
 );
 
 export default router;

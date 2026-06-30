@@ -48,3 +48,8 @@ export async function reviewRevisiSidang(
   const response = await api.patch(`/revisi-sidang/${revisiId}/review`, payload);
   return response.data;
 }
+
+export async function deleteRevisiSidangPermanent(revisiId: string) {
+  const response = await api.delete(`/revisi-sidang/${revisiId}`);
+  return response.data;
+}

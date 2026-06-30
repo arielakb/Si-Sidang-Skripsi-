@@ -8,6 +8,7 @@ import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import {
   createJadwalSidang,
+  deleteJadwalSidangPermanent,
   getJadwalSidang,
   updateJadwalSidangStatus
 } from "../../services/jadwalSidang";
@@ -103,6 +104,8 @@ export default function JadwalSidangPage() {
 
   const canManage = hasPermission("jadwal_sidang.manage");
 
+  const canDeletePermanent = hasPermission("jadwal_sidang.delete_permanent");
+
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [selectedJadwal, setSelectedJadwal] = useState<JadwalRow | null>(null);
   const [search, setSearch] = useState("");
@@ -121,7 +124,7 @@ export default function JadwalSidangPage() {
 
   const ruangQuery = useQuery({
     queryKey: ["ruang"],
-    queryFn: getRuang
+    queryFn: () => getRuang()
   });
 
   const skripsiCandidatesQuery = useQuery({
@@ -201,7 +204,12 @@ export default function JadwalSidangPage() {
       status: JadwalSidangStatus;
     }) => updateJadwalSidangStatus(id, status),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] }),
+        queryClient.invalidateQueries({ queryKey: ["skripsi-menunggu-jadwal"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] })
+      ]);
 
       setPageError("");
       setSuccessMessage("Status jadwal berhasil diperbarui.");
@@ -209,6 +217,31 @@ export default function JadwalSidangPage() {
     onError: (error) => {
       setSuccessMessage("");
       setPageError(getApiErrorMessage(error, "Gagal mengubah status jadwal."));
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (jadwalId: string) => deleteJadwalSidangPermanent(jadwalId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["jadwal-sidang"] }),
+        queryClient.invalidateQueries({ queryKey: ["skripsi-menunggu-jadwal"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] })
+      ]);
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Jadwal sidang berhasil dihapus permanen.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus permanen jadwal. Jika sudah memiliki nilai/revisi, gunakan Batalkan."
+        )
+      );
     }
   });
 
@@ -256,6 +289,40 @@ export default function JadwalSidangPage() {
     }
 
     createMutation.mutate();
+  }
+
+  function handleToggleJadwalStatus(item: JadwalRow) {
+    const nextStatus =
+      item.status === "DIBATALKAN" ? "DIJADWALKAN" : "DIBATALKAN";
+
+    const confirmed = window.confirm(
+      item.status === "DIBATALKAN"
+        ? "Aktifkan kembali jadwal sidang ini?"
+        : "Batalkan jadwal sidang ini? Data tetap tampil sebagai riwayat."
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+
+    statusMutation.mutate({
+      id: item.id,
+      status: nextStatus
+    });
+  }
+
+  function handleDeletePermanent(item: JadwalRow) {
+    const confirmed = window.confirm(
+      `Hapus permanen jadwal sidang "${item.skripsi?.title || "Tanpa judul"}"? Data yang sudah dihapus tidak dapat dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+
+    deleteMutation.mutate(item.id);
   }
 
   return (
@@ -376,6 +443,32 @@ export default function JadwalSidangPage() {
                     >
                       Detail
                     </button>
+
+                    {canManage ? (
+                      <button
+                        type="button"
+                        className={
+                          item.status === "DIBATALKAN"
+                            ? "primary-button"
+                            : "danger-button"
+                        }
+                        disabled={statusMutation.isPending}
+                        onClick={() => handleToggleJadwalStatus(item)}
+                      >
+                        {item.status === "DIBATALKAN" ? "Aktifkan" : "Batalkan"}
+                      </button>
+                    ) : null}
+
+                    {canDeletePermanent ? (
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => handleDeletePermanent(item)}
+                      >
+                        Hapus Permanen
+                      </button>
+                    ) : null}
                   </div>
                 )
               }

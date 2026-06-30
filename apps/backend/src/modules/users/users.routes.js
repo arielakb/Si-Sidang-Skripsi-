@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   assignRoles,
   createUser,
+  deleteUserPermanent,
   getUsers,
   updateUserStatus
 } from "./users.controller.js";
@@ -36,6 +37,13 @@ router.patch(
   authenticate,
   requirePermission("user.update"),
   updateUserStatus
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission("user.delete_permanent"),
+  deleteUserPermanent
 );
 
 export default router;

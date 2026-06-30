@@ -15,6 +15,64 @@ async function isAssignedDosenPembimbing(skripsiId, dosenId) {
   return Boolean(assignment);
 }
 
+async function safeCount(delegate, args) {
+  if (!delegate?.count) return 0;
+  return delegate.count(args);
+}
+
+async function safeDeleteMany(delegate, args) {
+  if (!delegate?.deleteMany) return;
+  return delegate.deleteMany(args);
+}
+
+async function getSkripsiPermanentDeleteDependencies(skripsiId) {
+  const [
+    berkas,
+    kodeEtik,
+    dosenSkripsi,
+    bimbinganLogs,
+    jadwalSidang,
+    nilaiSidang,
+    revisi,
+    revisiSidang,
+    pengesahan,
+    suratPerjanjian
+  ] = await Promise.all([
+    safeCount(prisma.berkas, { where: { skripsiId } }),
+    safeCount(prisma.kodeEtik, { where: { skripsiId } }),
+    safeCount(prisma.skripsiDosen, { where: { skripsiId } }),
+    safeCount(prisma.bimbinganLog, { where: { skripsiId } }),
+    safeCount(prisma.jadwalSidang, { where: { skripsiId } }),
+    safeCount(prisma.nilaiSidang, { where: { skripsiId } }),
+    safeCount(prisma.revisi, { where: { skripsiId } }),
+    safeCount(prisma.revisiSidang, { where: { skripsiId } }),
+    safeCount(prisma.pengesahan, { where: { skripsiId } }),
+    safeCount(prisma.suratPerjanjian, { where: { skripsiId } })
+  ]);
+
+  const details = {
+    berkas,
+    kodeEtik,
+    dosenSkripsi,
+    bimbinganLogs,
+    jadwalSidang,
+    nilaiSidang,
+    revisi: revisi + revisiSidang,
+    pengesahan,
+    suratPerjanjian
+  };
+
+  const total = Object.values(details).reduce(
+    (sum, value) => sum + Number(value || 0),
+    0
+  );
+
+  return {
+    total,
+    details
+  };
+}
+
 export async function getMySkripsi(req, res, next) {
   try {
     const data = await prisma.skripsi.findMany({
@@ -511,3 +569,157 @@ export async function approveMajuSidang(req, res, next) {
     return next(error);
   }
 }
+
+export async function updateSkripsiStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = [
+      "MENUNGGU_BERKAS",
+      "MENUNGGU_APPROVAL",
+      "MENUNGGU_REVISI",
+      "MENUNGGU_JADWAL",
+      "SIAP_SIDANG",
+      "DIJADWALKAN",
+      "BERLANGSUNG",
+      "EVALUASI_SIDANG",
+      "MENUNGGU_FINAL",
+      "MENUNGGU_PENGESAHAN",
+      "SELESAI",
+      "DITOLAK",
+      "DIBATALKAN",
+      "DIARSIPKAN",
+      "NONAKTIF"
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status skripsi tidak valid"
+      });
+    }
+
+    const skripsi = await prisma.skripsi.findUnique({
+      where: { id },
+      include: {
+        mahasiswa: true
+      }
+    });
+
+    if (!skripsi) {
+      return res.status(404).json({
+        success: false,
+        message: "Skripsi tidak ditemukan"
+      });
+    }
+
+    const updated = await prisma.skripsi.update({
+      where: { id },
+      data: {
+        status
+      },
+      include: {
+        mahasiswa: {
+          select: {
+            id: true,
+            identifier: true,
+            name: true,
+            email: true
+          }
+        },
+        peminatan: true,
+        jenisSkripsi: true,
+        dosenSkripsi: {
+          where: {
+            isActive: true
+          },
+          include: {
+            dosen: {
+              select: {
+                id: true,
+                identifier: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        berkas: true,
+        kodeEtik: true
+      }
+    });
+
+    await createNotification({
+      userId: skripsi.mahasiswaId,
+      title: "Status Skripsi Diperbarui",
+      message: `Status skripsi Anda diperbarui menjadi ${status}.`,
+      type: "SKRIPSI_STATUS",
+      entityType: "skripsi",
+      entityId: skripsi.id
+    });
+
+    return res.json({
+      success: true,
+      message: "Status skripsi berhasil diperbarui",
+      data: updated
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deleteSkripsiPermanent(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const skripsi = await prisma.skripsi.findUnique({
+      where: { id }
+    });
+
+    if (!skripsi) {
+      return res.status(404).json({
+        success: false,
+        message: "Skripsi tidak ditemukan"
+      });
+    }
+
+    const dependency = await getSkripsiPermanentDeleteDependencies(id);
+
+    if (dependency.total > 0) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Skripsi tidak dapat dihapus permanen karena sudah memiliki data akademik. Gunakan Nonaktifkan/Arsipkan agar riwayat tetap aman.",
+        data: dependency.details
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await safeDeleteMany(tx.notifikasi, {
+        where: {
+          entityType: "skripsi",
+          entityId: id
+        }
+      });
+
+      await safeDeleteMany(tx.gamification, {
+        where: {
+          skripsiId: id
+        }
+      });
+
+      await tx.skripsi.delete({
+        where: { id }
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: "Skripsi berhasil dihapus permanen"
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   approveFinalSkripsi,
+  deleteFinalBerkasPermanent,
+  deletePengesahanPermanent,
   rejectFinalSkripsi,
   uploadFinalSkripsi,
   uploadLembarPengesahan
@@ -39,6 +41,20 @@ router.post(
   authenticate,
   requirePermission("skripsi.approve_final"),
   rejectFinalSkripsi
+);
+
+router.delete(
+  "/berkas/:id",
+  authenticate,
+  requirePermission("finalisasi.delete_permanent"),
+  deleteFinalBerkasPermanent
+);
+
+router.delete(
+  "/pengesahan/:id",
+  authenticate,
+  requirePermission("finalisasi.delete_permanent"),
+  deletePengesahanPermanent
 );
 
 export default router;

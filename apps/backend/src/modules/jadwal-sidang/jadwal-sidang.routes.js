@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createJadwalSidang,
+  deleteJadwalSidangPermanent,
   getJadwalSidang,
   getJadwalSidangDetail,
   updateJadwalSidangStatus
@@ -36,6 +37,13 @@ router.patch(
   authenticate,
   requirePermission("jadwal_sidang.manage"),
   updateJadwalSidangStatus
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission("jadwal_sidang.delete_permanent"),
+  deleteJadwalSidangPermanent
 );
 
 export default router;

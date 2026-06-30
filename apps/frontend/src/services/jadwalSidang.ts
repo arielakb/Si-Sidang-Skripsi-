@@ -36,6 +36,11 @@ export async function getJadwalSidang(params: GetJadwalSidangParams = {}) {
   return response.data;
 }
 
+export async function deleteJadwalSidangPermanent(jadwalId: string) {
+  const response = await api.delete(`/jadwal-sidang/${jadwalId}`);
+  return response.data;
+}
+
 export async function createJadwalSidang(payload: CreateJadwalSidangPayload) {
   const response = await api.post("/jadwal-sidang", payload);
   return response.data;

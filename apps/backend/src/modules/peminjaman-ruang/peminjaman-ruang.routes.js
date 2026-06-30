@@ -2,9 +2,11 @@ import { Router } from "express";
 import {
   approvePeminjamanRuang,
   createPeminjamanRuang,
+  deletePeminjamanRuangPermanent,
   getMyPeminjamanRuang,
   getPeminjamanRuang,
-  rejectPeminjamanRuang
+  rejectPeminjamanRuang,
+  updatePeminjamanRuangStatus
 } from "./peminjaman-ruang.controller.js";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { requirePermission } from "../../middlewares/require-permission.js";
@@ -44,6 +46,20 @@ router.patch(
   authenticate,
   requirePermission("ruang.approve"),
   rejectPeminjamanRuang
+);
+
+router.patch(
+  "/:id/status",
+  authenticate,
+  requirePermission("ruang.approve"),
+  updatePeminjamanRuangStatus
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission("ruang.delete_permanent"),
+  deletePeminjamanRuangPermanent
 );
 
 export default router;

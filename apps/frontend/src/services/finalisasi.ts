@@ -55,3 +55,13 @@ export async function rejectFinalSkripsi(skripsiId: string, alasan: string) {
 
   return response.data;
 }
+
+export async function deleteFinalBerkasPermanent(berkasId: string) {
+  const response = await api.delete(`/finalisasi/berkas/${berkasId}`);
+  return response.data;
+}
+
+export async function deletePengesahanPermanent(pengesahanId: string) {
+  const response = await api.delete(`/finalisasi/pengesahan/${pengesahanId}`);
+  return response.data;
+}

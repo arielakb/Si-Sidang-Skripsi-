@@ -435,3 +435,149 @@ export async function rejectPeminjamanRuang(req, res, next) {
     return next(error);
   }
 }
+
+export async function updatePeminjamanRuangStatus(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { status, alasan } = req.body;
+
+    const allowedStatuses = ["DIAJUKAN", "DISETUJUI", "DITOLAK", "DIBATALKAN"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status peminjaman ruang tidak valid"
+      });
+    }
+
+    const peminjaman = await prisma.peminjamanRuang.findUnique({
+      where: { id },
+      include: {
+        ruang: true,
+        mahasiswa: true
+      }
+    });
+
+    if (!peminjaman) {
+      return res.status(404).json({
+        success: false,
+        message: "Peminjaman ruang tidak ditemukan"
+      });
+    }
+
+    if (status === "DISETUJUI") {
+      const conflict = await hasRoomConflict({
+        ruangId: peminjaman.ruangId,
+        waktuMulai: peminjaman.waktuMulai,
+        waktuSelesai: peminjaman.waktuSelesai,
+        excludeBorrowingId: peminjaman.id
+      });
+
+      if (conflict.conflict) {
+        return res.status(409).json({
+          success: false,
+          message: "Ruang sudah tidak tersedia pada waktu tersebut"
+        });
+      }
+    }
+
+    if (status === "DITOLAK" && !alasan) {
+      return res.status(400).json({
+        success: false,
+        message: "Alasan penolakan wajib diisi"
+      });
+    }
+
+    const updated = await prisma.peminjamanRuang.update({
+      where: { id },
+      data: {
+        status,
+        alasan: status === "DITOLAK" ? alasan : null,
+        reviewedById: status === "DIAJUKAN" ? null : req.user.id,
+        reviewedAt: status === "DIAJUKAN" ? null : new Date()
+      },
+      include: {
+        ruang: true,
+        mahasiswa: {
+          select: {
+            id: true,
+            identifier: true,
+            name: true,
+            email: true
+          }
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            identifier: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    await createNotification({
+      userId: peminjaman.mahasiswaId,
+      title: "Status Peminjaman Ruang Diperbarui",
+      message: `Status peminjaman ruang ${peminjaman.ruang.name} berubah menjadi ${status}.`,
+      type: "PEMINJAMAN_STATUS",
+      entityType: "peminjaman_ruang",
+      entityId: peminjaman.id
+    });
+
+    return res.json({
+      success: true,
+      message: "Status peminjaman ruang berhasil diperbarui",
+      data: updated
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deletePeminjamanRuangPermanent(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const peminjaman = await prisma.peminjamanRuang.findUnique({
+      where: { id }
+    });
+
+    if (!peminjaman) {
+      return res.status(404).json({
+        success: false,
+        message: "Peminjaman ruang tidak ditemukan"
+      });
+    }
+
+    if (peminjaman.status === "DISETUJUI") {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Peminjaman ruang yang sudah disetujui tidak dapat langsung dihapus permanen. Batalkan terlebih dahulu."
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (tx.notifikasi?.deleteMany) {
+        await tx.notifikasi.deleteMany({
+          where: {
+            entityType: "peminjaman_ruang",
+            entityId: id
+          }
+        });
+      }
+
+      await tx.peminjamanRuang.delete({
+        where: { id }
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: "Peminjaman ruang berhasil dihapus permanen"
+    });
+  } catch (error) {
+    return next(error);
+  }
+}

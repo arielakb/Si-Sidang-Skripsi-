@@ -74,13 +74,21 @@ export async function getNilaiSidang(req, res, next) {
     const nilaiAkhir = rows.length > 0 ? calculateWeightedScore(rows) : null;
     const nilaiHuruf = nilaiAkhir !== null ? await getGradeLetter(nilaiAkhir) : null;
 
+    const totalBobot = rows.reduce(
+      (sum, item) => sum + Number(item.bobot || 0),
+      0
+    );
+
     return res.json({
       success: true,
-      data: rows,
-      summary: {
-        nilaiAkhir,
-        nilaiHuruf,
-        jumlahInput: rows.length
+      data: {
+        rows,
+        summary: {
+          nilaiAkhir,
+          nilaiHuruf,
+          jumlahInput: rows.length,
+          totalBobot
+        }
       }
     });
   } catch (error) {
@@ -177,11 +185,45 @@ export async function inputNilaiSidang(req, res, next) {
       entityId: skripsi.id
     });
 
-    return res.json({
-      success: true,
-      message: "Nilai sidang berhasil disimpan",
-      data
-    });
+  const rows = await prisma.nilaiSidang.findMany({
+    where: {
+      skripsiId
+    },
+    include: {
+      dosen: {
+        select: {
+          id: true,
+          identifier: true,
+          name: true
+        }
+      }
+    },
+    orderBy: {
+      createdAt: "asc"
+    }
+  });
+
+  const nilaiAkhir = rows.length > 0 ? calculateWeightedScore(rows) : null;
+  const nilaiHuruf = nilaiAkhir !== null ? await getGradeLetter(nilaiAkhir) : null;
+  const totalBobot = rows.reduce(
+    (sum, item) => sum + Number(item.bobot || 0),
+    0
+  );
+
+  return res.json({
+    success: true,
+    message: "Nilai sidang berhasil disimpan",
+    data: {
+      nilai: data,
+      rows,
+      summary: {
+        nilaiAkhir,
+        nilaiHuruf,
+        jumlahInput: rows.length,
+        totalBobot
+      }
+    }
+  });
   } catch (error) {
     return next(error);
   }
@@ -242,6 +284,76 @@ export async function finalizeNilaiSidang(req, res, next) {
       success: true,
       message: "Nilai sidang berhasil difinalisasi",
       data: updated
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deleteNilaiSidangPermanent(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const nilai = await prisma.nilaiSidang.findUnique({
+      where: { id },
+      include: {
+        skripsi: true
+      }
+    });
+
+    if (!nilai) {
+      return res.status(404).json({
+        success: false,
+        message: "Nilai sidang tidak ditemukan"
+      });
+    }
+
+    if (nilai.skripsi?.status === "SELESAI") {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Nilai tidak dapat dihapus permanen karena skripsi sudah selesai."
+      });
+    }
+
+    await prisma.nilaiSidang.delete({
+      where: { id }
+    });
+
+    const rows = await prisma.nilaiSidang.findMany({
+      where: {
+        skripsiId: nilai.skripsiId
+      }
+    });
+
+    if (rows.length > 0) {
+      const nilaiAkhir = calculateWeightedScore(rows);
+      const nilaiHuruf = await getGradeLetter(nilaiAkhir);
+
+      await prisma.skripsi.update({
+        where: {
+          id: nilai.skripsiId
+        },
+        data: {
+          nilaiAkhir,
+          nilaiHuruf
+        }
+      });
+    } else {
+      await prisma.skripsi.update({
+        where: {
+          id: nilai.skripsiId
+        },
+        data: {
+          nilaiAkhir: null,
+          nilaiHuruf: null
+        }
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Nilai sidang berhasil dihapus permanen"
     });
   } catch (error) {
     return next(error);

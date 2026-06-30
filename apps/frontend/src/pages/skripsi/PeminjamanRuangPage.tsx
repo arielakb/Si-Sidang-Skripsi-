@@ -10,9 +10,11 @@ import { getRuang } from "../../services/masterData";
 import {
   approvePeminjamanRuang,
   createPeminjamanRuang,
+  deletePeminjamanRuangPermanent,
   getMyPeminjamanRuang,
   getPeminjamanRuang,
-  rejectPeminjamanRuang
+  rejectPeminjamanRuang,
+  updatePeminjamanRuangStatus
 } from "../../services/peminjamanRuang";
 import type { PeminjamanRuangItem } from "../../types/jadwal";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -104,6 +106,8 @@ export default function PeminjamanRuangPage() {
   const canBorrow = hasPermission("ruang.borrow");
   const canApprove = hasPermission("ruang.approve");
 
+  const canDeletePermanent = hasPermission("ruang.delete_permanent");
+
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [selectedPeminjaman, setSelectedPeminjaman] =
     useState<PeminjamanRow | null>(null);
@@ -117,7 +121,7 @@ export default function PeminjamanRuangPage() {
 
   const ruangQuery = useQuery({
     queryKey: ["ruang"],
-    queryFn: getRuang
+    queryFn: () => getRuang()
   });
 
   const myPeminjamanQuery = useQuery({
@@ -228,6 +232,61 @@ export default function PeminjamanRuangPage() {
     }
   });
 
+  const statusMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      alasan
+    }: {
+      id: string;
+      status: "DIAJUKAN" | "DISETUJUI" | "DITOLAK" | "DIBATALKAN";
+      alasan?: string;
+    }) =>
+      updatePeminjamanRuangStatus(id, {
+        status,
+        alasan
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-peminjaman-ruang"] }),
+        queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] })
+      ]);
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Status peminjaman ruang berhasil diperbarui.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(error, "Gagal mengubah status peminjaman ruang.")
+      );
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deletePeminjamanRuangPermanent(id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-peminjaman-ruang"] }),
+        queryClient.invalidateQueries({ queryKey: ["peminjaman-ruang"] })
+      ]);
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Peminjaman ruang berhasil dihapus permanen.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus permanen peminjaman ruang. Jika sudah disetujui, batalkan terlebih dahulu."
+        )
+      );
+    }
+  });
+
   function openCreateDrawer() {
     setDrawerMode("create");
     setSelectedPeminjaman(null);
@@ -305,6 +364,39 @@ export default function PeminjamanRuangPage() {
       id: selectedPeminjaman.id,
       alasan: alasanReject.trim()
     });
+  }
+
+  function handleToggleStatus(item: PeminjamanRow) {
+    const nextStatus = item.status === "DIBATALKAN" ? "DIAJUKAN" : "DIBATALKAN";
+
+    const confirmed = window.confirm(
+      item.status === "DIBATALKAN"
+        ? "Aktifkan kembali pengajuan peminjaman ini?"
+        : "Batalkan peminjaman ruang ini? Data tetap tampil sebagai riwayat."
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+
+    statusMutation.mutate({
+      id: item.id,
+      status: nextStatus
+    });
+  }
+
+  function handleDeletePermanent(item: PeminjamanRow) {
+    const confirmed = window.confirm(
+      `Hapus permanen peminjaman ruang "${getRuangLabel(item)}"? Data yang sudah dihapus tidak dapat dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+
+    deleteMutation.mutate(item.id);
   }
 
   const isLoading = canApprove
@@ -443,6 +535,32 @@ export default function PeminjamanRuangPage() {
                     >
                       Detail
                     </button>
+
+                    {canApprove ? (
+                      <button
+                        type="button"
+                        className={
+                          item.status === "DIBATALKAN"
+                            ? "primary-button"
+                            : "danger-button"
+                        }
+                        disabled={statusMutation.isPending}
+                        onClick={() => handleToggleStatus(item)}
+                      >
+                        {item.status === "DIBATALKAN" ? "Aktifkan" : "Batalkan"}
+                      </button>
+                    ) : null}
+
+                    {canDeletePermanent ? (
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => handleDeletePermanent(item)}
+                      >
+                        Hapus Permanen
+                      </button>
+                    ) : null}
                   </div>
                 )
               }

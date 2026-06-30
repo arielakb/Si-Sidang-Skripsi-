@@ -16,6 +16,7 @@ import {
 } from "../../services/finalisasi";
 import {
   createRevisiSidang,
+  deleteRevisiSidangPermanent,
   getRevisiSidangBySkripsi,
   reviewRevisiSidang,
   uploadRevisiSidang
@@ -66,6 +67,7 @@ export default function RevisiFinalisasiPage() {
   const canApproveFinal = hasPermission("skripsi.approve_final");
   const canUploadRevisi = hasPermission("revisi.upload");
   const canUploadBerkas = hasPermission(["berkas.upload", "revisi.upload"]);
+  const canDeleteRevisiPermanent = hasPermission("revisi.delete_permanent");
 
   const [selectedSkripsiId, setSelectedSkripsiId] = useState("");
   const [selectedRevisi, setSelectedRevisi] = useState<RevisiSidangItem | null>(
@@ -225,6 +227,34 @@ export default function RevisiFinalisasiPage() {
     onError: (error) => {
       setSuccessMessage("");
       setPageError(getApiErrorMessage(error, "Gagal review revisi."));
+    }
+  });
+
+  const deleteRevisiMutation = useMutation({
+    mutationFn: (revisiId: string) => deleteRevisiSidangPermanent(revisiId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["revisi-sidang"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi-list-for-revisi-final"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
+      ]);
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Revisi sidang berhasil dihapus permanen.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus revisi. Revisi yang sudah disetujui atau skripsi selesai tidak dapat dihapus."
+        )
+      );
     }
   });
 
@@ -440,6 +470,19 @@ export default function RevisiFinalisasiPage() {
     });
   }
 
+  function handleDeleteRevisi(item: RevisiSidangItem) {
+    const confirmed = window.confirm(
+      `Hapus permanen revisi "${item.catatan}"? Data yang sudah dihapus tidak dapat dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+
+    deleteRevisiMutation.mutate(item.id);
+  }
+
   const totalRevisi = revisiRows.length;
   const totalApproved = revisiRows.filter((item) =>
     ["DISETUJUI", "APPROVED", "APPROVE", "SELESAI"].includes(item.status)
@@ -643,6 +686,17 @@ export default function RevisiFinalisasiPage() {
                     >
                       Detail
                     </button>
+
+                    {canDeleteRevisiPermanent ? (
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={deleteRevisiMutation.isPending}
+                        onClick={() => handleDeleteRevisi(item)}
+                      >
+                        Hapus Permanen
+                      </button>
+                    ) : null}
                   </div>
                 )
               }
@@ -839,6 +893,27 @@ export default function RevisiFinalisasiPage() {
                       </button>
                     </div>
                   </div>
+                ) : null}
+                {canDeleteRevisiPermanent ? (
+                  <div className="drawer-section danger-zone">
+                    <h3>Hapus Permanen</h3>
+                    <p className="muted">
+                      Gunakan hanya untuk menghapus revisi yang salah input. Revisi yang sudah
+                      disetujui atau skripsi yang sudah selesai tidak dapat dihapus.
+                    </p>
+
+                    <button
+                      type="button"
+                      className="danger-button"
+                      disabled={deleteRevisiMutation.isPending}
+                      onClick={() => handleDeleteRevisi(selectedRevisi)}
+                    >
+                      {deleteRevisiMutation.isPending
+                        ? "Menghapus..."
+                        : "Hapus Permanen Revisi"}
+                    </button>
+                    drawerMode === "detail-revisi" && selectedRevisi
+                  </div>                  
                 ) : null}
               </div>
             ) : drawerMode === "finalisasi" ? (

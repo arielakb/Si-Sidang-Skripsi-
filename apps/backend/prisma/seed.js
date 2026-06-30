@@ -74,11 +74,23 @@ const permissions = [
   ["user.update", "user", "update", "Edit user"],
   ["user.delete", "user", "delete", "Hapus/nonaktifkan user"],
   ["user.assign_role", "user", "assign_role", "Assign role user"],
+  [
+    "user.delete_permanent",
+    "user",
+    "delete_permanent",
+    "Hapus permanen user"
+  ],
 
   ["public_schedule.read", "public_schedule", "read", "Lihat dashboard publik"],
 
   ["master_data.read", "master_data", "read", "Lihat master data"],
   ["master_data.manage", "master_data", "manage", "Kelola master data"],
+  [
+    "master_data.delete_permanent",
+    "master_data",
+    "delete_permanent",
+    "Hapus permanen master data"
+  ],
 
   ["skripsi.read", "skripsi", "read", "Lihat skripsi"],
   ["skripsi.create", "skripsi", "create", "Daftar skripsi/seminar"],
@@ -86,6 +98,12 @@ const permissions = [
   ["skripsi.assign_dosen", "skripsi", "assign_dosen", "Assign dosen skripsi"],
   ["skripsi.approve_final", "skripsi", "approve_final", "Approve berkas final"],
   ["skripsi.approve_sidang", "skripsi", "approve_sidang", "Approve mahasiswa maju sidang"],
+  [
+    "skripsi.delete_permanent",
+    "skripsi",
+    "delete_permanent",
+    "Hapus permanen skripsi"
+  ],
 
   ["berkas.upload", "berkas", "upload", "Upload berkas"],
   ["berkas.review", "berkas", "review", "Review berkas"],
@@ -101,18 +119,48 @@ const permissions = [
 
   ["jadwal_sidang.read", "jadwal_sidang", "read", "Lihat jadwal sidang"],
   ["jadwal_sidang.manage", "jadwal_sidang", "manage", "Kelola jadwal sidang"],
+  [
+  "jadwal_sidang.delete_permanent",
+  "jadwal_sidang",
+  "delete_permanent",
+  "Hapus permanen jadwal sidang"
+  ],
 
   ["ruang.read", "ruang", "read", "Lihat ruang"],
   ["ruang.borrow", "ruang", "borrow", "Ajukan peminjaman ruang"],
   ["ruang.approve", "ruang", "approve", "Approve/reject peminjaman ruang"],
   ["ruang.manage", "ruang", "manage", "Kelola master ruang"],
+  [
+  "ruang.delete_permanent",
+  "ruang",
+  "delete_permanent",
+  "Hapus permanen peminjaman ruang"
+  ],  
 
   ["nilai.input", "nilai", "input", "Input nilai sidang"],
   ["nilai.read", "nilai", "read", "Lihat nilai sidang"],
+  [
+  "nilai.delete_permanent",
+  "nilai",
+  "delete_permanent",
+  "Hapus permanen nilai sidang"
+  ],
 
   ["revisi.create", "revisi", "create", "Buat catatan revisi"],
   ["revisi.upload", "revisi", "upload", "Upload revisi"],
   ["revisi.approve", "revisi", "approve", "Approve revisi"],
+  [
+    "finalisasi.delete_permanent",
+    "finalisasi",
+    "delete_permanent",
+    "Hapus permanen data finalisasi"
+  ],
+  [
+    "revisi.delete_permanent",
+    "revisi",
+    "delete_permanent",
+    "Hapus permanen revisi"
+  ],
 
   ["gamification.read", "gamification", "read", "Lihat gamification"],
   ["gamification.manage", "gamification", "manage", "Kelola gamification"],
@@ -241,7 +289,8 @@ const rolePermissionMap = {
     "laporan.export",
     "notification.read",
     "berkas.download",
-    "audit.read"
+    "audit.read",
+    "skripsi.update"
   ],
 
   staf_prodi: [

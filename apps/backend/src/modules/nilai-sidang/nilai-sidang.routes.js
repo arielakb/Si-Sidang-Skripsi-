@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  deleteNilaiSidangPermanent,
   finalizeNilaiSidang,
   getNilaiSidang,
   inputNilaiSidang
@@ -28,6 +29,13 @@ router.post(
   authenticate,
   requirePermission("nilai.input"),
   finalizeNilaiSidang
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission("nilai.delete_permanent"),
+  deleteNilaiSidangPermanent
 );
 
 export default router;

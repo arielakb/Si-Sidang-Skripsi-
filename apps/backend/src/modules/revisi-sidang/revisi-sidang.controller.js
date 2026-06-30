@@ -1,3 +1,4 @@
+import fs from "fs/promises";
 import { prisma } from "../../config/prisma.js";
 import { createNotification } from "../../utils/notification.js";
 
@@ -9,6 +10,18 @@ function getUploadedFilePayload(file) {
     sizeBytes: BigInt(file.size),
     path: file.path
   };
+}
+
+async function removePhysicalFile(filePath) {
+  if (!filePath) return;
+
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      console.warn(`Gagal menghapus file fisik: ${filePath}`, error.message);
+    }
+  }
 }
 
 async function isAssignedDosen(skripsiId, dosenId) {
@@ -317,6 +330,111 @@ export async function reviewRevisiSidang(req, res, next) {
       success: true,
       message: "Review revisi berhasil disimpan",
       data: updated
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deleteRevisiSidangPermanent(req, res, next) {
+  try {
+    const { revisiId } = req.params;
+
+    const revisi = await prisma.revisi.findUnique({
+      where: { id: revisiId },
+      include: {
+        skripsi: true,
+        berkas: true
+      }
+    });
+
+    if (!revisi) {
+      return res.status(404).json({
+        success: false,
+        message: "Revisi sidang tidak ditemukan"
+      });
+    }
+
+    const approvedStatuses = ["DISETUJUI", "APPROVED", "APPROVE", "SELESAI"];
+
+    if (approvedStatuses.includes(revisi.status)) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Revisi yang sudah disetujui tidak dapat dihapus permanen. Simpan sebagai riwayat akademik."
+      });
+    }
+
+    if (revisi.skripsi?.status === "SELESAI") {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Revisi tidak dapat dihapus permanen karena skripsi sudah selesai."
+      });
+    }
+
+    const filePath = revisi.berkas?.path || null;
+
+    await prisma.$transaction(async (tx) => {
+      if (tx.notifikasi?.deleteMany) {
+        await tx.notifikasi.deleteMany({
+          where: {
+            entityType: "revisi",
+            entityId: revisi.id
+          }
+        });
+      }
+
+      await tx.revisi.delete({
+        where: {
+          id: revisiId
+        }
+      });
+
+      if (revisi.berkasId) {
+        await tx.berkas.deleteMany({
+          where: {
+            id: revisi.berkasId
+          }
+        });
+      }
+
+      const totalRevisi = await tx.revisi.count({
+        where: {
+          skripsiId: revisi.skripsiId
+        }
+      });
+
+      const pendingRevisi = await tx.revisi.count({
+        where: {
+          skripsiId: revisi.skripsiId,
+          status: {
+            not: "DISETUJUI"
+          }
+        }
+      });
+
+      if (
+        totalRevisi > 0 &&
+        pendingRevisi === 0 &&
+        revisi.skripsi.status === "MENUNGGU_REVISI"
+      ) {
+        await tx.skripsi.update({
+          where: {
+            id: revisi.skripsiId
+          },
+          data: {
+            status: "MENUNGGU_FINAL"
+          }
+        });
+      }
+    });
+
+    await removePhysicalFile(filePath);
+
+    return res.json({
+      success: true,
+      message: "Revisi sidang berhasil dihapus permanen"
     });
   } catch (error) {
     return next(error);

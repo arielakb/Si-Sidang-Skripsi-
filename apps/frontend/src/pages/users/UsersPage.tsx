@@ -8,11 +8,13 @@ import StatusBadge from "../../components/ui/StatusBadge";
 import {
   assignUserRoles,
   createUser,
+  deleteUserPermanent,
   getUsers,
   updateUserStatus
 } from "../../services/users";
 import type { UserItem } from "../../types/admin";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { useAuth } from "../../auth/AuthContext";
 
 type DrawerMode = "create" | "detail" | null;
 
@@ -97,6 +99,13 @@ function formatDate(value?: string | null) {
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
+
+  const { user: currentUser, hasPermission } = useAuth();
+
+  const canCreateUser = hasPermission("user.create");
+  const canUpdateUser = hasPermission("user.update");
+  const canAssignRole = hasPermission("user.assign_role");
+  const canDeletePermanent = hasPermission("user.delete_permanent");
 
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
@@ -217,6 +226,28 @@ export default function UsersPage() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (userId: string) => deleteUserPermanent(userId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["users"]
+      });
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("User berhasil dihapus permanen.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus permanen user. Jika user punya data akademik, gunakan Nonaktifkan."
+        )
+      );
+    }
+  });
+
   function openCreateDrawer() {
     setDrawerMode("create");
     setSelectedUser(null);
@@ -327,6 +358,23 @@ export default function UsersPage() {
     });
   }
 
+  function handleDeletePermanent(user: UserRow) {
+  if (currentUser?.id === user.id) {
+    setPageError("Anda tidak dapat menghapus akun sendiri.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Hapus permanen user "${user.name}"? Data yang sudah dihapus tidak dapat dikembalikan.`
+  );
+
+  if (!confirmed) return;
+
+  setPageError("");
+  setSuccessMessage("");
+  deleteMutation.mutate(user.id);
+}
+
   return (
     <section className="page-stack">
       <PageHeader
@@ -380,13 +428,15 @@ export default function UsersPage() {
               <option value="INACTIVE">INACTIVE</option>
             </select>
 
-            <button
-              type="button"
-              className="primary-button"
-              onClick={openCreateDrawer}
-            >
-              Tambah User
-            </button>
+            {canCreateUser ? (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={openCreateDrawer}
+              >
+                Tambah User
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -459,18 +509,47 @@ export default function UsersPage() {
                       Detail
                     </button>
 
-                    <button
-                      type="button"
-                      className={
-                        user.status === "ACTIVE"
-                          ? "danger-button"
-                          : "primary-button"
-                      }
-                      disabled={statusMutation.isPending}
-                      onClick={() => handleToggleStatus(user)}
-                    >
-                      {user.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
-                    </button>
+                    {canUpdateUser ? (
+                      <button
+                        type="button"
+                        className={
+                          user.status === "ACTIVE"
+                            ? "danger-button"
+                            : "primary-button"
+                        }
+                        disabled={
+                          statusMutation.isPending ||
+                          currentUser?.id === user.id
+                        }
+                        onClick={() => handleToggleStatus(user)}
+                        title={
+                          currentUser?.id === user.id
+                            ? "Tidak dapat menonaktifkan akun sendiri"
+                            : undefined
+                        }
+                      >
+                        {user.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
+                      </button>
+                    ) : null}
+
+                    {canDeletePermanent ? (
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={
+                          deleteMutation.isPending ||
+                          currentUser?.id === user.id
+                        }
+                        onClick={() => handleDeletePermanent(user)}
+                        title={
+                          currentUser?.id === user.id
+                            ? "Tidak dapat menghapus akun sendiri"
+                            : undefined
+                        }
+                      >
+                        Hapus Permanen
+                      </button>
+                    ) : null}
                   </div>
                 )
               }
@@ -609,52 +688,81 @@ export default function UsersPage() {
                   </div>
                 </div>
 
-                <div className="drawer-section">
-                  <h3>Atur Role</h3>
+                {canAssignRole ? (
+                  <div className="drawer-section">
+                    <h3>Atur Role</h3>
 
-                  <div className="role-check-grid">
-                    {roleOptions.map((role) => (
-                      <label key={role.slug} className="role-check-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedRoleSlugs.includes(role.slug)}
-                          onChange={() => toggleSelectedUserRole(role.slug)}
-                        />
-                        <span>{role.label}</span>
-                      </label>
-                    ))}
+                    <div className="role-check-grid">
+                      {roleOptions.map((role) => (
+                        <label key={role.slug} className="role-check-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedRoleSlugs.includes(role.slug)}
+                            onChange={() => toggleSelectedUserRole(role.slug)}
+                          />
+                          <span>{role.label}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={rolesMutation.isPending}
+                      onClick={handleSaveRoles}
+                    >
+                      {rolesMutation.isPending
+                        ? "Menyimpan..."
+                        : "Simpan Role"}
+                    </button>
                   </div>
+                ) : null}
+
+                {canUpdateUser ? (
+                  <div className="drawer-section">
+                    <h3>Status Akun</h3>
+
+                    <button
+                      type="button"
+                      className={
+                        selectedUser.status === "ACTIVE"
+                          ? "danger-button"
+                          : "primary-button"
+                      }
+                      disabled={
+                        statusMutation.isPending ||
+                        currentUser?.id === selectedUser.id
+                      }
+                      onClick={() => handleToggleStatus(selectedUser)}
+                    >
+                      {selectedUser.status === "ACTIVE"
+                        ? "Nonaktifkan User"
+                        : "Aktifkan User"}
+                    </button>
+                  </div>
+                ) : null}
+              {canDeletePermanent ? (
+                <div className="drawer-section danger-zone">
+                  <h3>Hapus Permanen</h3>
+                  <p className="muted">
+                    Hapus permanen hanya bisa dilakukan jika user belum memiliki data akademik.
+                    Jika user sudah pernah digunakan pada skripsi, bimbingan, berkas, atau nilai,
+                    gunakan Nonaktifkan.
+                  </p>
 
                   <button
                     type="button"
-                    className="primary-button"
-                    disabled={rolesMutation.isPending}
-                    onClick={handleSaveRoles}
-                  >
-                    {rolesMutation.isPending
-                      ? "Menyimpan..."
-                      : "Simpan Role"}
-                  </button>
-                </div>
-
-                <div className="drawer-section">
-                  <h3>Status Akun</h3>
-
-                  <button
-                    type="button"
-                    className={
-                      selectedUser.status === "ACTIVE"
-                        ? "danger-button"
-                        : "primary-button"
+                    className="danger-button"
+                    disabled={
+                      deleteMutation.isPending ||
+                      currentUser?.id === selectedUser.id
                     }
-                    disabled={statusMutation.isPending}
-                    onClick={() => handleToggleStatus(selectedUser)}
+                    onClick={() => handleDeletePermanent(selectedUser)}
                   >
-                    {selectedUser.status === "ACTIVE"
-                      ? "Nonaktifkan User"
-                      : "Aktifkan User"}
+                    {deleteMutation.isPending ? "Menghapus..." : "Hapus Permanen User"}
                   </button>
                 </div>
+              ) : null}
               </div>
             ) : null}
           </aside>

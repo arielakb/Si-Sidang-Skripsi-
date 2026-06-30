@@ -11,13 +11,43 @@ export type InputNilaiSidangPayload = {
 export async function getNilaiSidang(skripsiId: string) {
   const response = await api.get<{
     success: boolean;
-    data: {
-      rows: NilaiSidangItem[];
-      summary: NilaiSidangSummary;
-    };
+    data:
+      | NilaiSidangItem[]
+      | {
+          rows: NilaiSidangItem[];
+          summary: NilaiSidangSummary;
+        };
+    summary?: NilaiSidangSummary;
   }>(`/nilai-sidang/skripsi/${skripsiId}`);
 
-  return response.data.data;
+  const payload = response.data.data;
+
+  if (Array.isArray(payload)) {
+    return {
+      rows: payload,
+      summary:
+        response.data.summary ?? {
+          nilaiAkhir: null,
+          nilaiHuruf: null,
+          jumlahInput: payload.length,
+          totalBobot: payload.reduce(
+            (sum, item) => sum + Number(item.bobot || 0),
+            0
+          )
+        }
+    };
+  }
+
+  return {
+    rows: payload?.rows ?? [],
+    summary:
+      payload?.summary ?? {
+        nilaiAkhir: null,
+        nilaiHuruf: null,
+        jumlahInput: 0,
+        totalBobot: 0
+      }
+  };
 }
 
 export async function inputNilaiSidang(
@@ -33,5 +63,10 @@ export async function finalizeNilaiSidang(skripsiId: string) {
     `/nilai-sidang/skripsi/${skripsiId}/finalize`
   );
 
+  return response.data;
+}
+
+export async function deleteNilaiSidangPermanent(nilaiId: string) {
+  const response = await api.delete(`/nilai-sidang/${nilaiId}`);
   return response.data;
 }

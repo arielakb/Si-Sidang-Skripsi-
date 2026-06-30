@@ -7,6 +7,8 @@ import StatusBadge from "../../components/ui/StatusBadge";
 import {
   createPeminatan,
   createRuang,
+  deletePeminatanPermanent,
+  deleteRuangPermanent,
   getPeminatan,
   getRuang,
   updatePeminatan,
@@ -38,7 +40,7 @@ const emptyRuangForm = {
 export default function MasterDataPage() {
   const queryClient = useQueryClient();
 
-  const { hasRole } = useAuth();
+  const { hasRole, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>("peminatan");
   const [search, setSearch] = useState("");
   const [formMode, setFormMode] = useState<FormMode>("create");
@@ -59,25 +61,24 @@ export default function MasterDataPage() {
     "ketua_prodi"
   ]);
 
-  if (!canAccessMasterData) {
-    return (
-      <section className="page-stack">
-        <div className="alert-error">
-          Anda tidak memiliki akses ke halaman Master Data.
-        </div>
-      </section>
-    );
-  }
+  const canManagePeminatan = hasPermission("master_data.manage");
+  const canManageRuang = hasPermission("ruang.manage");
+  const canDeletePermanent = hasPermission("master_data.delete_permanent");
+
+  const canManageActiveTab =
+    activeTab === "peminatan" ? canManagePeminatan : canManageRuang;
 
 
   const peminatanQuery = useQuery({
-    queryKey: ["peminatan"],
-    queryFn: getPeminatan
+    queryKey: ["peminatan", "include-inactive"],
+    queryFn: () => getPeminatan({ includeInactive: true }),
+    enabled: canAccessMasterData
   });
 
   const ruangQuery = useQuery({
-    queryKey: ["ruang"],
-    queryFn: getRuang
+    queryKey: ["ruang", "include-inactive"],
+    queryFn: () => getRuang({ includeInactive: true }),
+    enabled: canAccessMasterData
   });
 
   const peminatanRows = useMemo(() => {
@@ -117,6 +118,7 @@ export default function MasterDataPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["peminatan"] });
+            queryClient.invalidateQueries({ queryKey: ["peminatan", "include-inactive"] });
 
       closeForm();
       setSuccessMessage(
@@ -150,6 +152,7 @@ export default function MasterDataPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["ruang"] });
+            queryClient.invalidateQueries({ queryKey: ["ruang", "include-inactive"] });
 
       closeForm();
       setSuccessMessage(
@@ -174,6 +177,7 @@ export default function MasterDataPage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["peminatan"] });
+            queryClient.invalidateQueries({ queryKey: ["peminatan", "include-inactive"] });
       setSuccessMessage("Status peminatan berhasil diperbarui.");
     },
     onError: (error) => {
@@ -199,6 +203,54 @@ export default function MasterDataPage() {
     onError: (error) => {
       setSuccessMessage("");
       setFormError(getApiErrorMessage(error, "Gagal mengubah status ruang."));
+    }
+  });
+
+  const deletePeminatanMutation = useMutation({
+    mutationFn: (item: Peminatan) => deletePeminatanPermanent(item.id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["peminatan"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["peminatan", "include-inactive"]
+        })
+      ]);
+
+      setSuccessMessage("Peminatan berhasil dihapus permanen.");
+      setFormError("");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus permanen peminatan. Jika sudah digunakan, nonaktifkan saja."
+        )
+      );
+    }
+  });
+
+  const deleteRuangMutation = useMutation({
+    mutationFn: (item: MasterRuang) => deleteRuangPermanent(item.id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ruang"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["ruang", "include-inactive"]
+        })
+      ]);
+
+      setSuccessMessage("Ruang berhasil dihapus permanen.");
+      setFormError("");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setFormError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus permanen ruang. Jika sudah digunakan, nonaktifkan saja."
+        )
+      );
     }
   });
 
@@ -256,6 +308,28 @@ export default function MasterDataPage() {
     setIsFormOpen(true);
   }
 
+  function handleDeletePeminatan(item: Peminatan) {
+    const confirmed = window.confirm(
+      `Hapus permanen peminatan "${item.name}"? Data yang sudah terhapus tidak bisa dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    resetMessages();
+    deletePeminatanMutation.mutate(item);
+  }
+
+  function handleDeleteRuang(item: MasterRuang) {
+    const confirmed = window.confirm(
+      `Hapus permanen ruang "${item.name}"? Data yang sudah terhapus tidak bisa dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    resetMessages();
+    deleteRuangMutation.mutate(item);
+  }
+
   function handleSubmitPeminatan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     resetMessages();
@@ -286,6 +360,16 @@ export default function MasterDataPage() {
   }
 
   const isLoading = peminatanQuery.isLoading || ruangQuery.isLoading;
+
+  if (!canAccessMasterData) {
+    return (
+      <section className="page-stack">
+        <div className="alert-error">
+          Anda tidak memiliki akses ke halaman Master Data.
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="page-stack">
@@ -349,9 +433,11 @@ export default function MasterDataPage() {
               }
             />
 
-            <button type="button" className="primary-button" onClick={openCreateForm}>
-              {activeTab === "peminatan" ? "Tambah Peminatan" : "Tambah Ruang"}
-            </button>
+            {canManageActiveTab ? (
+              <button type="button" className="primary-button" onClick={openCreateForm}>
+                {activeTab === "peminatan" ? "Tambah Peminatan" : "Tambah Ruang"}
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -403,25 +489,49 @@ export default function MasterDataPage() {
                 key: "actions",
                 header: "Aksi",
                 align: "right",
-                render: (item) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => handleEditPeminatan(item)}
-                    >
-                      Edit
-                    </button>
+                render: (item) => {
+                  const hasAnyAction = canManagePeminatan || canDeletePermanent;
 
-                    <button
-                      type="button"
-                      className={item.isActive ? "danger-button" : "secondary-button"}
-                      onClick={() => togglePeminatanStatusMutation.mutate(item)}
-                    >
-                      {item.isActive ? "Nonaktifkan" : "Aktifkan"}
-                    </button>
-                  </div>
-                )
+                  if (!hasAnyAction) {
+                    return <span className="muted">-</span>;
+                  }
+
+                  return (
+                    <div className="table-actions">
+                      {canManagePeminatan ? (
+                        <>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => handleEditPeminatan(item)}
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            className={item.isActive ? "danger-button" : "secondary-button"}
+                            onClick={() => togglePeminatanStatusMutation.mutate(item)}
+                            disabled={togglePeminatanStatusMutation.isPending}
+                          >
+                            {item.isActive ? "Nonaktifkan" : "Aktifkan"}
+                          </button>
+                        </>
+                      ) : null}
+
+                      {canDeletePermanent ? (
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => handleDeletePeminatan(item)}
+                          disabled={deletePeminatanMutation.isPending}
+                        >
+                          Hapus Permanen
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                }
               }
             ]}
           />
@@ -477,25 +587,49 @@ export default function MasterDataPage() {
                 key: "actions",
                 header: "Aksi",
                 align: "right",
-                render: (item) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => handleEditRuang(item)}
-                    >
-                      Edit
-                    </button>
+                render: (item) => {
+                  const hasAnyAction = canManageRuang || canDeletePermanent;
 
-                    <button
-                      type="button"
-                      className={item.isActive ? "danger-button" : "secondary-button"}
-                      onClick={() => toggleRuangStatusMutation.mutate(item)}
-                    >
-                      {item.isActive ? "Nonaktifkan" : "Aktifkan"}
-                    </button>
-                  </div>
-                )
+                  if (!hasAnyAction) {
+                    return <span className="muted">-</span>;
+                  }
+
+                  return (
+                    <div className="table-actions">
+                      {canManageRuang ? (
+                        <>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => handleEditRuang(item)}
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            className={item.isActive ? "danger-button" : "secondary-button"}
+                            onClick={() => toggleRuangStatusMutation.mutate(item)}
+                            disabled={toggleRuangStatusMutation.isPending}
+                          >
+                            {item.isActive ? "Nonaktifkan" : "Aktifkan"}
+                          </button>
+                        </>
+                      ) : null}
+
+                      {canDeletePermanent ? (
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => handleDeleteRuang(item)}
+                          disabled={deleteRuangMutation.isPending}
+                        >
+                          Hapus Permanen
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                }
               }
             ]}
           />

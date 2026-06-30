@@ -40,6 +40,25 @@ export type GetSkripsiListParams = {
   limit?: number;
 };
 
+export type UpdateSkripsiStatusPayload = {
+  status:
+    | "MENUNGGU_BERKAS"
+    | "MENUNGGU_APPROVAL"
+    | "MENUNGGU_REVISI"
+    | "MENUNGGU_JADWAL"
+    | "SIAP_SIDANG"
+    | "DIJADWALKAN"
+    | "BERLANGSUNG"
+    | "EVALUASI_SIDANG"
+    | "MENUNGGU_FINAL"
+    | "MENUNGGU_PENGESAHAN"
+    | "SELESAI"
+    | "DITOLAK"
+    | "DIBATALKAN"
+    | "DIARSIPKAN"
+    | "NONAKTIF";
+};
+
 export async function getSkripsiList(params: GetSkripsiListParams = {}) {
   const response = await api.get<{
     success: boolean;
@@ -54,6 +73,19 @@ export async function getSkripsiList(params: GetSkripsiListParams = {}) {
     params
   });
 
+  return response.data;
+}
+
+export async function updateSkripsiStatus(
+  skripsiId: string,
+  payload: UpdateSkripsiStatusPayload
+) {
+  const response = await api.patch(`/skripsi/${skripsiId}/status`, payload);
+  return response.data;
+}
+
+export async function deleteSkripsiPermanent(skripsiId: string) {
+  const response = await api.delete(`/skripsi/${skripsiId}`);
   return response.data;
 }
 

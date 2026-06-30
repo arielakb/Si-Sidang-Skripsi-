@@ -56,6 +56,21 @@ export async function rejectPeminjamanRuang(id: string, alasan: string) {
   const response = await api.patch(`/peminjaman-ruang/${id}/reject`, {
     alasan
   });
+  return response.data;
+}
 
+export async function updatePeminjamanRuangStatus(
+  id: string,
+  payload: {
+    status: "DIAJUKAN" | "DISETUJUI" | "DITOLAK" | "DIBATALKAN";
+    alasan?: string;
+  }
+) {
+  const response = await api.patch(`/peminjaman-ruang/${id}/status`, payload);
+  return response.data;
+}
+
+export async function deletePeminjamanRuangPermanent(id: string) {
+  const response = await api.delete(`/peminjaman-ruang/${id}`);
   return response.data;
 }

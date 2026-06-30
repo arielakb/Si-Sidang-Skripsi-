@@ -5,6 +5,57 @@ function normalizeDate(value) {
   return value ? new Date(value) : null;
 }
 
+async function safeCount(delegate, args) {
+  if (!delegate?.count) return 0;
+  return delegate.count(args);
+}
+
+async function safeDeleteMany(delegate, args) {
+  if (!delegate?.deleteMany) return;
+  return delegate.deleteMany(args);
+}
+
+async function getJadwalPermanentDeleteDependencies(jadwal) {
+  const [nilaiSidang, revisi, revisiSidang, pengesahan] = await Promise.all([
+    safeCount(prisma.nilaiSidang, {
+      where: {
+        skripsiId: jadwal.skripsiId
+      }
+    }),
+    safeCount(prisma.revisi, {
+      where: {
+        skripsiId: jadwal.skripsiId
+      }
+    }),
+    safeCount(prisma.revisiSidang, {
+      where: {
+        skripsiId: jadwal.skripsiId
+      }
+    }),
+    safeCount(prisma.pengesahan, {
+      where: {
+        skripsiId: jadwal.skripsiId
+      }
+    })
+  ]);
+
+  const details = {
+    nilaiSidang,
+    revisi: revisi + revisiSidang,
+    pengesahan
+  };
+
+  const total = Object.values(details).reduce(
+    (sum, value) => sum + Number(value || 0),
+    0
+  );
+
+  return {
+    total,
+    details
+  };
+}
+
 async function checkRoomScheduleConflict({ ruangId, waktuMulai, waktuSelesai, excludeJadwalId }) {
   if (!ruangId) return null;
 
@@ -438,7 +489,12 @@ export async function updateJadwalSidangStatus(req, res, next) {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowedStatuses = ["DIJADWALKAN", "BERLANGSUNG", "SELESAI", "DIBATALKAN"];
+    const allowedStatuses = [
+      "DIJADWALKAN",
+      "BERLANGSUNG",
+      "SELESAI",
+      "DIBATALKAN"
+    ];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
@@ -447,9 +503,8 @@ export async function updateJadwalSidangStatus(req, res, next) {
       });
     }
 
-    const jadwal = await prisma.jadwalSidang.update({
+    const existing = await prisma.jadwalSidang.findUnique({
       where: { id },
-      data: { status },
       include: {
         skripsi: {
           include: {
@@ -459,37 +514,156 @@ export async function updateJadwalSidangStatus(req, res, next) {
       }
     });
 
-    if (status === "BERLANGSUNG") {
-      await prisma.skripsi.update({
-        where: { id: jadwal.skripsiId },
-        data: {
-          status: "EVALUASI_SIDANG"
-        }
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Jadwal sidang tidak ditemukan"
       });
     }
 
-    if (status === "SELESAI") {
-      await prisma.skripsi.update({
-        where: { id: jadwal.skripsiId },
-        data: {
-          status: "MENUNGGU_REVISI"
+    if (["DIJADWALKAN", "BERLANGSUNG"].includes(status) && existing.ruangId) {
+      const jadwalConflict = await checkRoomScheduleConflict({
+        ruangId: existing.ruangId,
+        waktuMulai: existing.waktuMulai,
+        waktuSelesai: existing.waktuSelesai,
+        excludeJadwalId: existing.id
+      });
+
+      if (jadwalConflict) {
+        return res.status(409).json({
+          success: false,
+          message: "Ruang sudah digunakan untuk jadwal sidang lain pada waktu tersebut"
+        });
+      }
+
+      const borrowingConflict = await checkRoomBorrowingConflict({
+        ruangId: existing.ruangId,
+        waktuMulai: existing.waktuMulai,
+        waktuSelesai: existing.waktuSelesai
+      });
+
+      if (borrowingConflict) {
+        return res.status(409).json({
+          success: false,
+          message: "Ruang sudah digunakan untuk peminjaman lain pada waktu tersebut"
+        });
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const jadwal = await tx.jadwalSidang.update({
+        where: { id },
+        data: { status },
+        include: {
+          ruang: true,
+          skripsi: {
+            include: {
+              mahasiswa: true
+            }
+          }
         }
       });
-    }
+
+      let nextSkripsiStatus = null;
+
+      if (status === "DIJADWALKAN") {
+        nextSkripsiStatus = "SIAP_SIDANG";
+      }
+
+      if (status === "BERLANGSUNG") {
+        nextSkripsiStatus = "EVALUASI_SIDANG";
+      }
+
+      if (status === "SELESAI") {
+        nextSkripsiStatus = "MENUNGGU_REVISI";
+      }
+
+      if (status === "DIBATALKAN") {
+        nextSkripsiStatus = "MENUNGGU_JADWAL";
+      }
+
+      if (nextSkripsiStatus) {
+        await tx.skripsi.update({
+          where: { id: jadwal.skripsiId },
+          data: {
+            status: nextSkripsiStatus
+          }
+        });
+      }
+
+      return jadwal;
+    });
 
     await createNotification({
-      userId: jadwal.skripsi.mahasiswaId,
+      userId: result.skripsi.mahasiswaId,
       title: "Status Jadwal Sidang Diperbarui",
       message: `Status jadwal sidang Anda berubah menjadi ${status}.`,
       type: "JADWAL_STATUS",
       entityType: "jadwal_sidang",
-      entityId: jadwal.id
+      entityId: result.id
     });
 
     return res.json({
       success: true,
       message: "Status jadwal sidang berhasil diperbarui",
-      data: jadwal
+      data: result
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deleteJadwalSidangPermanent(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const jadwal = await prisma.jadwalSidang.findUnique({
+      where: { id }
+    });
+
+    if (!jadwal) {
+      return res.status(404).json({
+        success: false,
+        message: "Jadwal sidang tidak ditemukan"
+      });
+    }
+
+    const dependency = await getJadwalPermanentDeleteDependencies(jadwal);
+
+    if (dependency.total > 0) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Jadwal sidang tidak dapat dihapus permanen karena skripsi sudah memiliki data nilai/revisi/pengesahan. Gunakan Batalkan.",
+        data: dependency.details
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await safeDeleteMany(tx.notifikasi, {
+        where: {
+          entityType: "jadwal_sidang",
+          entityId: id
+        }
+      });
+
+      await tx.jadwalSidang.delete({
+        where: { id }
+      });
+
+      await tx.skripsi.update({
+        where: {
+          id: jadwal.skripsiId
+        },
+        data: {
+          status: "MENUNGGU_JADWAL"
+        }
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: "Jadwal sidang berhasil dihapus permanen"
     });
   } catch (error) {
     return next(error);

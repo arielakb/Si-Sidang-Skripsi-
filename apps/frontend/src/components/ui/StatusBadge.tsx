@@ -20,7 +20,9 @@ const successStatuses = [
   "SIAP_MAJU_SIDANG",
   "VALID",
   "DIJADWALKAN",
-  "BERLANGSUNG"
+  "BERLANGSUNG",
+  "SUDAH_DISETUJUI",
+  "SETUJU"
 ];
 
 const warningStatuses = [
@@ -44,7 +46,8 @@ const warningStatuses = [
   "HAMPIR_SELESAI",
   "POST",
   "PATCH",
-  "PUT"
+  "PUT",
+  "BELUM_DISETUJUI"
 ];
 
 const dangerStatuses = [
@@ -54,6 +57,7 @@ const dangerStatuses = [
   "TOLAK",
   "REJECTED",
   "DIBATALKAN",
+  "DIARSIPKAN",
   "DELETE",
   "CLIENT_ERROR",
   "SERVER_ERROR",

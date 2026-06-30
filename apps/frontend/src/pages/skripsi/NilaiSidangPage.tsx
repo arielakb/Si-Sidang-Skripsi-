@@ -8,6 +8,7 @@ import MetricCard from "../../components/ui/MetricCard";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import {
+  deleteNilaiSidangPermanent,
   finalizeNilaiSidang,
   getNilaiSidang,
   inputNilaiSidang
@@ -69,6 +70,8 @@ export default function NilaiSidangPage() {
   const queryClient = useQueryClient();
 
   const canInput = hasPermission("nilai.input");
+
+  const canDeletePermanent = hasPermission("nilai.delete_permanent");
 
   const [selectedSkripsiId, setSelectedSkripsiId] = useState("");
   const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
@@ -145,14 +148,30 @@ export default function NilaiSidangPage() {
         catatan: form.catatan.trim() || undefined
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["nilai-sidang"]
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["nilai-sidang", selectedSkripsiId]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["nilai-sidang"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi-list-for-nilai"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
+      ]);
+
+      await queryClient.refetchQueries({
+        queryKey: ["nilai-sidang", selectedSkripsiId],
+        exact: true
       });
 
       setForm(emptyForm);
       closeDrawer();
       setPageError("");
-      setSuccessMessage("Nilai sidang berhasil disimpan.");
+      setSuccessMessage("Nilai sidang berhasil disimpan dan daftar nilai diperbarui.");
     },
     onError: (error) => {
       setSuccessMessage("");
@@ -169,10 +188,27 @@ export default function NilaiSidangPage() {
     mutationFn: () => finalizeNilaiSidang(selectedSkripsiId),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["nilai-sidang"] }),
-        queryClient.invalidateQueries({ queryKey: ["skripsi-list-for-nilai"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] })
+        queryClient.invalidateQueries({
+          queryKey: ["nilai-sidang", selectedSkripsiId]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["nilai-sidang"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi-list-for-nilai"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["my-skripsi"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
       ]);
+
+      await queryClient.refetchQueries({
+        queryKey: ["nilai-sidang", selectedSkripsiId],
+        exact: true
+      });
 
       setPageError("");
       setSuccessMessage("Nilai sidang berhasil difinalisasi.");
@@ -183,6 +219,44 @@ export default function NilaiSidangPage() {
         getApiErrorMessage(
           error,
           "Gagal finalize nilai. Pastikan minimal satu nilai sudah diinput."
+        )
+      );
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (nilaiId: string) => deleteNilaiSidangPermanent(nilaiId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["nilai-sidang", selectedSkripsiId]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["nilai-sidang"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi-list-for-nilai"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
+      ]);
+
+      await queryClient.refetchQueries({
+        queryKey: ["nilai-sidang", selectedSkripsiId],
+        exact: true
+      });
+
+      closeDrawer();
+      setPageError("");
+      setSuccessMessage("Nilai sidang berhasil dihapus permanen.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(
+        getApiErrorMessage(
+          error,
+          "Gagal menghapus nilai. Nilai pada skripsi yang sudah selesai tidak dapat dihapus."
         )
       );
     }
@@ -235,6 +309,18 @@ export default function NilaiSidangPage() {
     }
 
     inputMutation.mutate();
+  }
+
+  function handleDeleteNilai(item: NilaiSidangItem) {
+    const confirmed = window.confirm(
+      `Hapus permanen nilai komponen "${formatKomponen(item.komponen)}"? Data yang sudah dihapus tidak dapat dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+    deleteMutation.mutate(item.id);
   }
 
   const totalNilai = rows.length;
@@ -431,6 +517,17 @@ export default function NilaiSidangPage() {
                     >
                       Detail
                     </button>
+
+                    {canDeletePermanent ? (
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => handleDeleteNilai(item)}
+                      >
+                        Hapus Permanen
+                      </button>
+                    ) : null}
                   </div>
                 )
               }
@@ -556,6 +653,25 @@ export default function NilaiSidangPage() {
                     </strong>
                   </div>
 
+                  {canDeletePermanent ? (
+                    <div className="drawer-section danger-zone">
+                      <h3>Hapus Permanen</h3>
+                      <p className="muted">
+                        Gunakan hanya untuk menghapus nilai yang salah input. Nilai pada skripsi
+                        yang sudah selesai tidak dapat dihapus.
+                      </p>
+
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => handleDeleteNilai(selectedNilai)}
+                      >
+                        {deleteMutation.isPending ? "Menghapus..." : "Hapus Permanen Nilai"}
+                      </button>
+                    </div>
+                  ) : null}
+                  
                   <div className="info-row">
                     <span>Identifier Dosen</span>
                     <strong>{selectedNilai.dosen?.identifier || "-"}</strong>

@@ -2,10 +2,12 @@ import { Router } from "express";
 import {
   approveMajuSidang,
   assignPembimbing,
+  deleteSkripsiPermanent,
   getBimbinganCounter,
   getMySkripsi,
   getSkripsiDetail,
-  getSkripsiList
+  getSkripsiList,
+  updateSkripsiStatus
 } from "./skripsi.controller.js";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { requirePermission } from "../../middlewares/require-permission.js";
@@ -38,6 +40,20 @@ router.get(
   authenticate,
   requirePermission("bimbingan.read"),
   getBimbinganCounter
+);
+
+router.patch(
+  "/:id/status",
+  authenticate,
+  requirePermission("skripsi.update"),
+  updateSkripsiStatus
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission("skripsi.delete_permanent"),
+  deleteSkripsiPermanent
 );
 
 router.post(
