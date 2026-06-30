@@ -7,17 +7,32 @@ import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { api } from "../../services/api";
 
+type NotificationStatus = "READ" | "UNREAD";
+
 type NotificationItem = {
   id: string;
   title?: string | null;
   message?: string | null;
   body?: string | null;
   type?: string | null;
+  status?: NotificationStatus | string | null;
   isRead?: boolean | null;
   readAt?: string | null;
   actionUrl?: string | null;
   data?: unknown;
   createdAt?: string | null;
+};
+
+type NotificationsResponse = {
+  success?: boolean;
+  data: NotificationItem[];
+  meta?: {
+    unreadCount?: number;
+    total?: number;
+    page?: number;
+    limit?: number;
+    totalPages?: number;
+  };
 };
 
 type DrawerMode = "detail" | null;
@@ -33,6 +48,12 @@ function formatDate(value?: string | null) {
 
 function getMessage(item: NotificationItem) {
   return item.message || item.body || "-";
+}
+
+function isNotificationRead(item: NotificationItem) {
+  if (typeof item.isRead === "boolean") return item.isRead;
+
+  return String(item.status || "").toUpperCase() === "READ";
 }
 
 function safeJson(value: unknown) {
@@ -56,13 +77,7 @@ export default function NotificationsPage() {
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
-      const response = await api.get<{
-        data: NotificationItem[];
-        meta?: {
-          unreadCount?: number;
-          total?: number;
-        };
-      }>("/notifications", {
+      const response = await api.get<NotificationsResponse>("/notifications", {
         params: {
           limit: 50
         }
@@ -75,7 +90,7 @@ export default function NotificationsPage() {
   const notifications = notificationsQuery.data?.data ?? [];
   const unreadCount =
     notificationsQuery.data?.meta?.unreadCount ??
-    notifications.filter((item) => !item.isRead).length;
+    notifications.filter((item) => !isNotificationRead(item)).length;
 
   const typeOptions = useMemo(() => {
     return Array.from(
@@ -91,6 +106,8 @@ export default function NotificationsPage() {
     const keyword = search.toLowerCase();
 
     return notifications.filter((item) => {
+      const isRead = isNotificationRead(item);
+
       const matchesSearch = `${item.title ?? ""} ${getMessage(item)} ${
         item.type ?? ""
       }`
@@ -99,9 +116,9 @@ export default function NotificationsPage() {
 
       const matchesRead =
         readFilter === "READ"
-          ? Boolean(item.isRead)
+          ? isRead
           : readFilter === "UNREAD"
-            ? !item.isRead
+            ? !isRead
             : true;
 
       const matchesType = typeFilter ? item.type === typeFilter : true;
@@ -110,27 +127,49 @@ export default function NotificationsPage() {
     });
   }, [notifications, search, readFilter, typeFilter]);
 
+  async function refreshNotificationQueries() {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ["notifications"]
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["notifications", "unread-count"]
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["notification-unread-count"]
+      })
+    ]);
+  }
+
   const markReadMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["notifications"]
-      });
+    onSuccess: async (_response, id) => {
+      if (selectedNotification?.id === id) {
+        setSelectedNotification({
+          ...selectedNotification,
+          status: "READ",
+          isRead: true,
+          readAt: selectedNotification.readAt ?? new Date().toISOString()
+        });
+      }
+
+      await refreshNotificationQueries();
     }
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      const unreadRows = notifications.filter((item) => !item.isRead);
-
-      await Promise.all(
-        unreadRows.map((item) => api.patch(`/notifications/${item.id}/read`))
-      );
-    },
+    mutationFn: () => api.patch("/notifications/read-all"),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["notifications"]
-      });
+      if (selectedNotification) {
+        setSelectedNotification({
+          ...selectedNotification,
+          status: "READ",
+          isRead: true,
+          readAt: selectedNotification.readAt ?? new Date().toISOString()
+        });
+      }
+
+      await refreshNotificationQueries();
     }
   });
 
@@ -144,8 +183,9 @@ export default function NotificationsPage() {
     setDrawerMode(null);
   }
 
-  const totalNotifications = notifications.length;
-  const readCount = totalNotifications - unreadCount;
+  const totalNotifications =
+    notificationsQuery.data?.meta?.total ?? notifications.length;
+  const readCount = Math.max(totalNotifications - unreadCount, 0);
 
   return (
     <section className="page-stack">
@@ -224,7 +264,9 @@ export default function NotificationsPage() {
               disabled={markAllReadMutation.isPending || unreadCount === 0}
               onClick={() => markAllReadMutation.mutate()}
             >
-              Tandai Semua Dibaca
+              {markAllReadMutation.isPending
+                ? "Memproses..."
+                : "Tandai Semua Dibaca"}
             </button>
           </div>
         </div>
@@ -233,6 +275,11 @@ export default function NotificationsPage() {
           <EmptyState
             title="Memuat notifikasi..."
             description="Mohon tunggu sebentar."
+          />
+        ) : notificationsQuery.isError ? (
+          <EmptyState
+            title="Gagal memuat notifikasi"
+            description="Coba muat ulang halaman atau periksa koneksi backend."
           />
         ) : (
           <DataTable
@@ -271,7 +318,7 @@ export default function NotificationsPage() {
                 align: "center",
                 render: (item) => (
                   <StatusBadge
-                    value={item.isRead ? "DIBACA" : "BELUM_DIBACA"}
+                    value={isNotificationRead(item) ? "DIBACA" : "BELUM_DIBACA"}
                     size="sm"
                   />
                 )
@@ -280,28 +327,32 @@ export default function NotificationsPage() {
                 key: "actions",
                 header: "Aksi",
                 align: "right",
-                render: (item) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => openDetailDrawer(item)}
-                    >
-                      Detail
-                    </button>
+                render: (item) => {
+                  const isRead = isNotificationRead(item);
 
-                    {!item.isRead ? (
+                  return (
+                    <div className="table-actions">
                       <button
                         type="button"
-                        className="primary-button"
-                        disabled={markReadMutation.isPending}
-                        onClick={() => markReadMutation.mutate(item.id)}
+                        className="secondary-button"
+                        onClick={() => openDetailDrawer(item)}
                       >
-                        Tandai Dibaca
+                        Detail
                       </button>
-                    ) : null}
-                  </div>
-                )
+
+                      {!isRead ? (
+                        <button
+                          type="button"
+                          className="primary-button"
+                          disabled={markReadMutation.isPending}
+                          onClick={() => markReadMutation.mutate(item.id)}
+                        >
+                          Tandai Dibaca
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                }
               }
             ]}
           />
@@ -334,7 +385,9 @@ export default function NotificationsPage() {
                 <strong>{selectedNotification.title || "Tanpa judul"}</strong>
                 <StatusBadge
                   value={
-                    selectedNotification.isRead ? "DIBACA" : "BELUM_DIBACA"
+                    isNotificationRead(selectedNotification)
+                      ? "DIBACA"
+                      : "BELUM_DIBACA"
                   }
                 />
               </div>
@@ -353,7 +406,7 @@ export default function NotificationsPage() {
                 <div className="info-row">
                   <span>Status Baca</span>
                   <strong>
-                    {selectedNotification.isRead
+                    {isNotificationRead(selectedNotification)
                       ? "Sudah dibaca"
                       : "Belum dibaca"}
                   </strong>
@@ -382,7 +435,7 @@ export default function NotificationsPage() {
                 </pre>
               </div>
 
-              {!selectedNotification.isRead ? (
+              {!isNotificationRead(selectedNotification) ? (
                 <button
                   type="button"
                   className="primary-button"

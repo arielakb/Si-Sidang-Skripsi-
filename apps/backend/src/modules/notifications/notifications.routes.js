@@ -25,17 +25,17 @@ router.get(
 );
 
 router.patch(
-  "/:id/read",
-  authenticate,
-  requirePermission("notification.read"),
-  markNotificationAsRead
-);
-
-router.patch(
   "/read-all",
   authenticate,
   requirePermission("notification.read"),
   markAllNotificationsAsRead
+);
+
+router.patch(
+  "/:id/read",
+  authenticate,
+  requirePermission("notification.read"),
+  markNotificationAsRead
 );
 
 export default router;

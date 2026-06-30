@@ -1,175 +1,198 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../auth/AuthContext";
 import DataTable from "../../components/ui/DataTable";
 import EmptyState from "../../components/ui/EmptyState";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
-import { getApiErrorMessage } from "../../utils/apiError";
 import {
   assignPembimbing,
-  getDosenPembimbingOptions,
-  getKompreSkripsiList
+  getSkripsiList
+} from "../../services/skripsi";
+import {
+  getDosenPembimbingOptions
 } from "../../services/seminarProposal";
+import { getApiErrorMessage } from "../../utils/apiError";
 
-type DosenOption = {
-  id: string;
-  identifier?: string | null;
-  name: string;
-  email?: string | null;
-};
+function getPembimbingRows(item: any) {
+  return (item.dosenSkripsi ?? []).filter(
+    (row: any) => row.peran === "PEMBIMBING" && row.isActive !== false
+  );
+}
 
-type KompreSkripsiItem = {
-  id: string;
-  title?: string | null;
-  status?: string | null;
-  tahap?: string | null;
-  mahasiswa?: {
-    name?: string | null;
-    identifier?: string | null;
-  } | null;
-  peminatan?: {
-    name?: string | null;
-  } | null;
-  dosenSkripsi?: Array<{
-    id: string;
-    peran: string;
-    isActive?: boolean;
-    dosen: DosenOption;
-  }>;
-};
+function getPembimbingLabel(item: any) {
+  const rows = getPembimbingRows(item);
 
-type DrawerMode = "assign" | null;
+  if (rows.length === 0) return "Belum ada pembimbing";
+
+  return rows
+    .map((row: any) => row.dosen?.name || row.dosenId)
+    .join(", ");
+}
+
+function isAssignableStatus(status?: string | null) {
+  return ![
+    "SELESAI",
+    "DITOLAK",
+    "NONAKTIF",
+    "DIBATALKAN",
+    "DIARSIPKAN"
+  ].includes(String(status || "").toUpperCase());
+}
 
 export default function AssignPembimbingPage() {
+  const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
+  const canAssign = hasPermission("skripsi.assign_dosen");
+
   const [search, setSearch] = useState("");
-  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
-  const [selectedSkripsi, setSelectedSkripsi] =
-    useState<KompreSkripsiItem | null>(null);
-  const [selectedDosenId, setSelectedDosenId] = useState("");
+  const [selectedDosenMap, setSelectedDosenMap] = useState<Record<string, string[]>>({});
   const [pageError, setPageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   const skripsiQuery = useQuery({
     queryKey: ["kompre-skripsi-list"],
-    queryFn: getKompreSkripsiList
+    queryFn: () =>
+      getSkripsiList({
+        tahap: "KOMPRE",
+        limit: 100
+      })
   });
 
   const dosenQuery = useQuery({
     queryKey: ["dosen-pembimbing-options"],
-    queryFn: getDosenPembimbingOptions
+    queryFn: getDosenPembimbingOptions,
+    enabled: canAssign
   });
 
-  const skripsiRows = (skripsiQuery.data ?? []) as KompreSkripsiItem[];
-  const dosenOptions = (dosenQuery.data ?? []) as DosenOption[];
+  const skripsiRows = skripsiQuery.data?.data ?? [];
+  const dosenOptions = dosenQuery.data ?? [];
 
   const filteredRows = useMemo(() => {
     const keyword = search.toLowerCase();
 
-    return skripsiRows.filter((item) =>
-      `${item.title ?? ""} ${item.mahasiswa?.name ?? ""} ${
-        item.mahasiswa?.identifier ?? ""
-      } ${item.peminatan?.name ?? ""} ${item.status ?? ""}`
-        .toLowerCase()
-        .includes(keyword)
-    );
+    return skripsiRows
+      .filter((item: any) => isAssignableStatus(item.status))
+      .filter((item: any) =>
+        `${item.title ?? ""} ${item.mahasiswa?.name ?? ""} ${
+          item.mahasiswa?.identifier ?? ""
+        } ${item.status ?? ""} ${getPembimbingLabel(item)}`
+          .toLowerCase()
+          .includes(keyword)
+      );
   }, [skripsiRows, search]);
 
   const assignMutation = useMutation({
     mutationFn: ({
       skripsiId,
-      dosenId
+      dosenIds
     }: {
       skripsiId: string;
-      dosenId: string;
+      dosenIds: string[];
     }) =>
       assignPembimbing(skripsiId, {
-        dosenId
+        dosenIds
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["kompre-skripsi-list"]
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["kompre-skripsi-list"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["my-skripsi"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
+      ]);
 
-      closeDrawer();
       setPageError("");
       setSuccessMessage("Dosen pembimbing berhasil ditetapkan.");
     },
     onError: (error) => {
       setSuccessMessage("");
       setPageError(
-        getApiErrorMessage(error, "Gagal menetapkan dosen pembimbing.")
+        getApiErrorMessage(
+          error,
+          "Gagal menetapkan dosen pembimbing. Pastikan jumlah pembimbing memenuhi aturan workflow."
+        )
       );
     }
   });
 
-  function getCurrentPembimbing(item: KompreSkripsiItem) {
-    return item.dosenSkripsi?.find(
-      (row) => row.peran === "PEMBIMBING" && row.isActive !== false
-    );
+  function getSelectedDosenIds(item: any) {
+    const selected = selectedDosenMap[item.id];
+
+    if (selected) return selected;
+
+    return getPembimbingRows(item).map((row: any) => row.dosenId);
   }
 
-  function openAssignDrawer(item: KompreSkripsiItem) {
-    const currentPembimbing = getCurrentPembimbing(item);
+  function toggleDosen(skripsiId: string, dosenId: string) {
+    setSelectedDosenMap((current) => {
+      const currentIds = current[skripsiId] ?? [];
+      const nextIds = currentIds.includes(dosenId)
+        ? currentIds.filter((id) => id !== dosenId)
+        : [...currentIds, dosenId];
 
-    setSelectedSkripsi(item);
-    setSelectedDosenId(currentPembimbing?.dosen.id || "");
+      return {
+        ...current,
+        [skripsiId]: nextIds
+      };
+    });
+  }
+
+  function handleAssign(item: any) {
+    const dosenIds = getSelectedDosenIds(item);
+
     setPageError("");
     setSuccessMessage("");
-    setDrawerMode("assign");
-  }
 
-  function closeDrawer() {
-    setDrawerMode(null);
-    setSelectedSkripsi(null);
-    setSelectedDosenId("");
-    setPageError("");
-  }
-
-  function handleAssign() {
-    if (!selectedSkripsi) {
-      setPageError("Pilih skripsi terlebih dahulu.");
-      return;
-    }
-
-    if (!selectedDosenId) {
-      setPageError("Pilih dosen pembimbing terlebih dahulu.");
+    if (dosenIds.length === 0) {
+      setPageError("Pilih minimal satu dosen pembimbing.");
       return;
     }
 
     assignMutation.mutate({
-      skripsiId: selectedSkripsi.id,
-      dosenId: selectedDosenId
+      skripsiId: item.id,
+      dosenIds
     });
   }
 
-  const selectedCurrentPembimbing = selectedSkripsi
-    ? getCurrentPembimbing(selectedSkripsi)
-    : undefined;
+  if (!canAssign) {
+    return (
+      <section className="page-stack">
+        <div className="alert-error">
+          Anda tidak memiliki akses untuk assign dosen pembimbing.
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="page-stack">
       <PageHeader
-        eyebrow="Administrasi"
+        eyebrow="Administrasi Skripsi"
         title="Assign Dosen Pembimbing"
-        description="Tetapkan dosen pembimbing untuk mahasiswa yang sudah lulus seminar proposal dan masuk tahap KOMPRE."
+        description="Tetapkan lebih dari satu dosen pembimbing untuk mahasiswa yang sudah lolos seminar proposal."
       />
 
       {successMessage ? (
         <div className="state-card success">{successMessage}</div>
       ) : null}
 
-      {pageError && !drawerMode ? (
-        <div className="alert-error">{pageError}</div>
-      ) : null}
+      {pageError ? <div className="alert-error">{pageError}</div> : null}
 
-      <section className="list-card assign-table-card">
+      <section className="list-card">
         <div className="table-toolbar master-table-toolbar">
           <div>
-            <h2>Daftar Skripsi Tahap KOMPRE</h2>
+            <h2>Daftar Skripsi Siap Bimbingan</h2>
             <p className="muted">
-              List skripsi yang siap ditetapkan dosen pembimbingnya.
+              Setelah pembimbing ditetapkan, status skripsi berubah menjadi BIMBINGAN.
             </p>
           </div>
 
@@ -177,20 +200,20 @@ export default function AssignPembimbingPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari judul, mahasiswa, NPM..."
+              placeholder="Cari judul, mahasiswa, status, pembimbing..."
             />
           </div>
         </div>
 
         {skripsiQuery.isLoading || dosenQuery.isLoading ? (
           <EmptyState
-            title="Memuat data..."
+            title="Memuat data skripsi..."
             description="Mohon tunggu sebentar."
           />
         ) : (
           <DataTable
             data={filteredRows}
-            emptyMessage="Belum ada skripsi pada tahap KOMPRE"
+            emptyMessage="Belum ada skripsi yang siap assign pembimbing"
             columns={[
               {
                 key: "no",
@@ -199,63 +222,74 @@ export default function AssignPembimbingPage() {
                 render: (_item, index) => index + 1
               },
               {
-                key: "title",
-                header: "Judul",
-                render: (item) => (
+                key: "skripsi",
+                header: "Skripsi",
+                render: (item: any) => (
                   <div className="table-title-cell">
                     <strong>{item.title || "Tanpa judul"}</strong>
-                    <span>{item.peminatan?.name || "-"}</span>
+                    <span>
+                      {item.mahasiswa?.name || "-"} •{" "}
+                      {item.mahasiswa?.identifier || "-"}
+                    </span>
                   </div>
                 )
               },
               {
-                key: "mahasiswa",
-                header: "Mahasiswa",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.mahasiswa?.name || "-"}</strong>
-                    <span>{item.mahasiswa?.identifier || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "pembimbing",
-                header: "Pembimbing Saat Ini",
-                render: (item) => {
-                  const currentPembimbing = getCurrentPembimbing(item);
-
-                  return currentPembimbing ? (
-                    <div className="table-title-cell">
-                      <strong>{currentPembimbing.dosen.name}</strong>
-                      <span>
-                        {currentPembimbing.dosen.identifier ||
-                          currentPembimbing.dosen.email ||
-                          "-"}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="muted">Belum ada pembimbing</span>
-                  );
-                }
+                key: "peminatan",
+                header: "Peminatan",
+                render: (item: any) => item.peminatan?.name || "-"
               },
               {
                 key: "status",
                 header: "Status",
                 align: "center",
-                render: (item) => <StatusBadge value={item.status} size="sm" />
+                render: (item: any) => <StatusBadge value={item.status} size="sm" />
+              },
+              {
+                key: "current",
+                header: "Pembimbing Saat Ini",
+                render: (item: any) => getPembimbingLabel(item)
+              },
+              {
+                key: "pilih",
+                header: "Pilih Pembimbing",
+                render: (item: any) => {
+                  const selectedIds = getSelectedDosenIds(item);
+
+                  return (
+                    <div className="role-check-grid compact-check-grid">
+                      {dosenOptions.map((dosen: any) => (
+                        <label key={dosen.id} className="role-check-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(dosen.id)}
+                            onChange={() => toggleDosen(item.id, dosen.id)}
+                          />
+                          <span>
+                            <strong>{dosen.name}</strong>
+                            <small>{dosen.identifier || dosen.email || "-"}</small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  );
+                }
               },
               {
                 key: "actions",
                 header: "Aksi",
                 align: "right",
-                render: (item) => (
+                render: (item: any) => (
                   <div className="table-actions">
                     <button
                       type="button"
                       className="primary-button"
-                      onClick={() => openAssignDrawer(item)}
+                      disabled={assignMutation.isPending}
+                      onClick={() => handleAssign(item)}
                     >
-                      Atur Pembimbing
+                      {assignMutation.isPending
+                        ? "Menyimpan..."
+                        : "Simpan Pembimbing"}
                     </button>
                   </div>
                 )
@@ -264,99 +298,6 @@ export default function AssignPembimbingPage() {
           />
         )}
       </section>
-
-      {drawerMode === "assign" && selectedSkripsi ? (
-        <div className="crud-drawer-backdrop" role="presentation">
-          <aside
-            className="crud-drawer assign-drawer"
-            aria-label="Assign dosen pembimbing"
-          >
-            <div className="crud-drawer-head">
-              <div>
-                <p className="eyebrow">Assign Pembimbing</p>
-                <h2>Atur Dosen Pembimbing</h2>
-              </div>
-
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={closeDrawer}
-              >
-                Tutup
-              </button>
-            </div>
-
-            {pageError ? <div className="alert-error">{pageError}</div> : null}
-
-            <div className="assign-detail-stack">
-              <div className="skripsi-detail-title">
-                <strong>{selectedSkripsi.title || "Tanpa judul"}</strong>
-                <StatusBadge value={selectedSkripsi.status} />
-              </div>
-
-              <div className="info-list">
-                <div className="info-row">
-                  <span>Mahasiswa</span>
-                  <strong>{selectedSkripsi.mahasiswa?.name || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>NPM</span>
-                  <strong>{selectedSkripsi.mahasiswa?.identifier || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Peminatan</span>
-                  <strong>{selectedSkripsi.peminatan?.name || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Pembimbing Saat Ini</span>
-                  <p>
-                    {selectedCurrentPembimbing
-                      ? `${selectedCurrentPembimbing.dosen.name} — ${
-                          selectedCurrentPembimbing.dosen.identifier ||
-                          selectedCurrentPembimbing.dosen.email ||
-                          "-"
-                        }`
-                      : "Belum ada pembimbing"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="drawer-section">
-                <h3>Pilih Dosen Pembimbing</h3>
-
-                <label>
-                  <span>Dosen Pembimbing</span>
-                  <select
-                    value={selectedDosenId}
-                    onChange={(event) => setSelectedDosenId(event.target.value)}
-                  >
-                    <option value="">Pilih dosen</option>
-                    {dosenOptions.map((dosen) => (
-                      <option key={dosen.id} value={dosen.id}>
-                        {dosen.name} — {dosen.identifier || dosen.email || "-"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={!selectedDosenId || assignMutation.isPending}
-                  onClick={handleAssign}
-                >
-                  {assignMutation.isPending
-                    ? "Menyimpan..."
-                    : "Simpan Pembimbing"}
-                </button>
-              </div>
-            </div>
-          </aside>
-        </div>
-      ) : null}
     </section>
   );
 }

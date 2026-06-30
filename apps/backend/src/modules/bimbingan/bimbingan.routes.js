@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  approveMajuSidang,
   completeBimbingan,
   confirmBimbingan,
   getBimbinganBySkripsi,
@@ -24,6 +25,13 @@ router.post(
   authenticate,
   requirePermission("bimbingan.create"),
   requestBimbingan
+);
+
+router.patch(
+  "/skripsi/:skripsiId/approve-maju-sidang",
+  authenticate,
+  requirePermission("skripsi.approve_sidang"),
+  approveMajuSidang
 );
 
 router.patch(

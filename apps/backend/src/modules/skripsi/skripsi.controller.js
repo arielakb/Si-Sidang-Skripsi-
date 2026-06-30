@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { createNotification } from "../../utils/notification.js";
 import { getUserRoles } from "../rbac/rbac.service.js";
+import { getWorkflowRuleInt } from "../sidang/sidang.service.js";
 
 async function isAssignedDosenPembimbing(skripsiId, dosenId) {
   const assignment = await prisma.skripsiDosen.findFirst({
@@ -180,12 +181,27 @@ export async function getSkripsiDetail(req, res, next) {
 export async function assignPembimbing(req, res, next) {
   try {
     const { id } = req.params;
-    const { dosenIds = [] } = req.body;
+    const uniqueDosenIds = Array.from(
+      new Set((req.body?.dosenIds ?? []).filter(Boolean))
+    );
 
-    if (!Array.isArray(dosenIds) || dosenIds.length === 0) {
+    if (!Array.isArray(req.body?.dosenIds) || uniqueDosenIds.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Minimal satu dosen pembimbing wajib dipilih"
+      });
+    }
+
+    const minPembimbing = await getWorkflowRuleInt(
+      "BIMBINGAN",
+      "MIN_PEMBIMBING",
+      2
+    );
+
+    if (uniqueDosenIds.length < minPembimbing) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimal dosen pembimbing adalah ${minPembimbing}.`
       });
     }
 
@@ -206,37 +222,56 @@ export async function assignPembimbing(req, res, next) {
     if (!["KOMPRE", "SIDANG_SKRIPSI"].includes(skripsi.tahap)) {
       return res.status(400).json({
         success: false,
-        message: "Pembimbing hanya bisa ditetapkan setelah seminar proposal disetujui"
+        message:
+          "Pembimbing hanya bisa ditetapkan setelah seminar proposal lolos"
+      });
+    }
+
+    if (
+      ["SELESAI", "DITOLAK", "NONAKTIF", "DIBATALKAN", "DIARSIPKAN"].includes(
+        skripsi.status
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Skripsi sudah tidak aktif sehingga pembimbing tidak dapat diubah"
       });
     }
 
     const dosenUsers = await prisma.user.findMany({
       where: {
         id: {
-          in: dosenIds
+          in: uniqueDosenIds
         },
         status: "ACTIVE",
         userRoles: {
           some: {
             role: {
               slug: {
-                in: ["dosen_pembimbing", "dosen_koordinator", "dosen_penguji"]
+                in: ["dosen_pembimbing", "dosen_koordinator", "ketua_prodi"]
               }
             }
           }
         }
+      },
+      select: {
+        id: true,
+        name: true,
+        identifier: true,
+        email: true
       }
     });
 
-    if (dosenUsers.length !== dosenIds.length) {
+    if (dosenUsers.length !== uniqueDosenIds.length) {
       return res.status(400).json({
         success: false,
-        message: "Sebagian dosen tidak valid atau tidak memiliki role dosen"
+        message:
+          "Sebagian dosen tidak valid, tidak aktif, atau bukan dosen pembimbing"
       });
     }
 
-    await prisma.$transaction([
-      prisma.skripsiDosen.updateMany({
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.skripsiDosen.updateMany({
         where: {
           skripsiId: id,
           peran: "PEMBIMBING",
@@ -245,24 +280,67 @@ export async function assignPembimbing(req, res, next) {
         data: {
           isActive: false
         }
-      }),
-      prisma.skripsiDosen.createMany({
-        data: dosenUsers.map((dosen) => ({
-          skripsiId: id,
-          dosenId: dosen.id,
-          peran: "PEMBIMBING",
-          assignedById: req.user.id,
-          bobotNilai: null
-        })),
-        skipDuplicates: true
-      }),
-      prisma.skripsi.update({
+      });
+
+      for (const dosen of dosenUsers) {
+        await tx.skripsiDosen.upsert({
+          where: {
+            skripsiId_dosenId_peran: {
+              skripsiId: id,
+              dosenId: dosen.id,
+              peran: "PEMBIMBING"
+            }
+          },
+          update: {
+            isActive: true,
+            assignedById: req.user.id,
+            assignedAt: new Date(),
+            bobotNilai: null
+          },
+          create: {
+            skripsiId: id,
+            dosenId: dosen.id,
+            peran: "PEMBIMBING",
+            assignedById: req.user.id,
+            bobotNilai: null
+          }
+        });
+      }
+
+      return tx.skripsi.update({
         where: { id },
         data: {
-          status: "MENUNGGU_BERKAS"
+          status: "BIMBINGAN"
+        },
+        include: {
+          mahasiswa: {
+            select: {
+              id: true,
+              identifier: true,
+              name: true,
+              email: true
+            }
+          },
+          peminatan: true,
+          jenisSkripsi: true,
+          dosenSkripsi: {
+            where: {
+              isActive: true
+            },
+            include: {
+              dosen: {
+                select: {
+                  id: true,
+                  identifier: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
         }
-      })
-    ]);
+      });
+    });
 
     for (const dosen of dosenUsers) {
       await createNotification({
@@ -278,7 +356,8 @@ export async function assignPembimbing(req, res, next) {
     await createNotification({
       userId: skripsi.mahasiswaId,
       title: "Dosen Pembimbing Telah Ditentukan",
-      message: "Dosen pembimbing skripsi Anda telah ditentukan.",
+      message:
+        "Dosen pembimbing skripsi Anda telah ditentukan. Anda sudah dapat mengajukan bimbingan.",
       type: "PEMBIMBING_ASSIGNMENT",
       entityType: "skripsi",
       entityId: skripsi.id
@@ -286,7 +365,8 @@ export async function assignPembimbing(req, res, next) {
 
     return res.json({
       success: true,
-      message: "Dosen pembimbing berhasil ditetapkan"
+      message: "Dosen pembimbing berhasil ditetapkan",
+      data: updated
     });
   } catch (error) {
     return next(error);

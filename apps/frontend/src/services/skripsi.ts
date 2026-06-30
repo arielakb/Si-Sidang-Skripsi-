@@ -103,3 +103,18 @@ export async function approveMajuSidang(
 
   return response.data;
 }
+
+export async function assignPembimbing(
+  skripsiId: string,
+  payload: {
+    dosenIds: string[];
+  }
+) {
+  const response = await api.post<{
+    success: boolean;
+    message: string;
+    data?: unknown;
+  }>(`/skripsi/${skripsiId}/assign-pembimbing`, payload);
+
+  return response.data;
+}

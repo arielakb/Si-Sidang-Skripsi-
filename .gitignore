@@ -14,3 +14,18 @@ uploads
 *.log
 
 sisidang-demo-package.zip
+# Sisidang temporary patch/audit artifacts
+_phase*/
+_audit*/
+_cleanup*/
+_fix*/
+_archive_cleanup_*/
+phase_*.zip
+phase6*.zip
+audit_*.zip
+*_audit.zip
+backend_*_error.log
+backend_*.log
+backup_before_reset_*.sql
+*.backup-before-*.css
+*.append.css

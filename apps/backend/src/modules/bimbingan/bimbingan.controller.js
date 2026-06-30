@@ -1,5 +1,12 @@
 import { prisma } from "../../config/prisma.js";
+import { getUserRoles } from "../rbac/rbac.service.js";
 import { createNotification } from "../../utils/notification.js";
+import {
+  getActiveSidang,
+  getLatestSidang,
+  getNextAttemptNo,
+  getWorkflowRuleInt
+} from "../sidang/sidang.service.js";
 
 async function getSkripsiOr404(skripsiId) {
   return prisma.skripsi.findUnique({
@@ -32,6 +39,28 @@ function isPembimbing(skripsi, userId) {
   return getActivePembimbingIds(skripsi).includes(userId);
 }
 
+
+function isBimbinganReadAllRole(roles) {
+  return roles.some((role) =>
+    ["admin", "ketua_prodi", "dosen_koordinator", "staf_prodi"].includes(role)
+  );
+}
+
+async function canReadBimbinganSkripsi(skripsi, userId) {
+  const roles = await getUserRoles(userId);
+
+  if (isBimbinganReadAllRole(roles)) {
+    return true;
+  }
+
+  return isMahasiswaOwner(skripsi, userId) || isPembimbing(skripsi, userId);
+}
+
+
+async function getRequiredBimbinganCount() {
+  return getWorkflowRuleInt("BIMBINGAN", "MIN_BIMBINGAN_VALID", 8);
+}
+
 export async function getBimbinganBySkripsi(req, res, next) {
   try {
     const { skripsiId } = req.params;
@@ -45,7 +74,9 @@ export async function getBimbinganBySkripsi(req, res, next) {
       });
     }
 
-    if (!isMahasiswaOwner(skripsi, req.user.id) && !isPembimbing(skripsi, req.user.id)) {
+    const canRead = await canReadBimbinganSkripsi(skripsi, req.user.id);
+
+    if (!canRead) {
       return res.status(403).json({
         success: false,
         message: "Anda tidak memiliki akses ke data bimbingan ini"
@@ -76,14 +107,15 @@ export async function getBimbinganBySkripsi(req, res, next) {
     });
 
     const validCount = data.filter((item) => item.status === "DIVALIDASI").length;
+    const requiredCount = await getRequiredBimbinganCount();
 
     return res.json({
       success: true,
       data,
       meta: {
         validCount,
-        requiredCount: 8,
-        canRequestSidang: validCount >= 8
+        requiredCount,
+        canRequestSidang: validCount >= requiredCount
       }
     });
   } catch (error) {
@@ -433,10 +465,12 @@ export async function validateBimbinganByMahasiswa(req, res, next) {
       }
     });
 
+    const requiredCount = await getRequiredBimbinganCount();
+
     await createNotification({
       userId: bimbingan.dosenId,
       title: "Bimbingan Divalidasi Mahasiswa",
-      message: `Mahasiswa telah mengonfirmasi bimbingan. Counter saat ini ${validCount}/8.`,
+      message: `Mahasiswa telah mengonfirmasi bimbingan. Counter saat ini ${validCount}/${requiredCount}.`,
       type: "BIMBINGAN_DIVALIDASI",
       entityType: "bimbingan",
       entityId: bimbingan.id
@@ -449,10 +483,196 @@ export async function validateBimbinganByMahasiswa(req, res, next) {
         bimbingan: updated,
         counter: {
           validCount,
-          requiredCount: 8,
-          canRequestSidang: validCount >= 8
+          requiredCount,
+          canRequestSidang: validCount >= requiredCount
         }
       }
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function approveMajuSidang(req, res, next) {
+  try {
+    const { skripsiId } = req.params;
+    const { catatan } = req.body ?? {};
+
+    const skripsi = await prisma.skripsi.findUnique({
+      where: {
+        id: skripsiId
+      },
+      include: {
+        mahasiswa: {
+          select: {
+            id: true,
+            identifier: true,
+            name: true,
+            email: true
+          }
+        },
+        dosenSkripsi: {
+          where: {
+            peran: "PEMBIMBING",
+            isActive: true
+          },
+          include: {
+            dosen: {
+              select: {
+                id: true,
+                identifier: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!skripsi) {
+      return res.status(404).json({
+        success: false,
+        message: "Skripsi tidak ditemukan"
+      });
+    }
+
+    const isAssignedPembimbing = skripsi.dosenSkripsi.some(
+      (item) => item.dosenId === req.user.id
+    );
+
+    if (!isAssignedPembimbing) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Hanya dosen pembimbing aktif pada skripsi ini yang dapat approve maju seminar hasil"
+      });
+    }
+
+    if (
+      ["SELESAI", "DITOLAK", "NONAKTIF", "DIBATALKAN", "DIARSIPKAN"].includes(
+        skripsi.status
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Skripsi sudah tidak aktif"
+      });
+    }
+
+    const requiredCount = await getRequiredBimbinganCount();
+
+    const validCount = await prisma.bimbinganLog.count({
+      where: {
+        skripsiId,
+        status: "DIVALIDASI"
+      }
+    });
+
+    if (validCount < requiredCount) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimal bimbingan valid untuk maju seminar hasil adalah ${requiredCount}. Saat ini baru ${validCount}.`
+      });
+    }
+
+    const activeSeminarHasil = await getActiveSidang(
+      skripsiId,
+      "SEMINAR_HASIL"
+    );
+
+    if (activeSeminarHasil) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Seminar hasil aktif sudah ada. Lanjutkan proses seminar hasil tersebut."
+      });
+    }
+
+    const latestSeminarHasil = await getLatestSidang(
+      skripsiId,
+      "SEMINAR_HASIL"
+    );
+
+    if (latestSeminarHasil?.hasil === "LOLOS") {
+      return res.status(409).json({
+        success: false,
+        message: "Seminar hasil sudah lolos"
+      });
+    }
+
+    const attemptNo = await getNextAttemptNo(skripsiId, "SEMINAR_HASIL");
+
+    const result = await prisma.$transaction(async (tx) => {
+      const sidang = await tx.sidang.create({
+        data: {
+          skripsiId,
+          jenis: "SEMINAR_HASIL",
+          attemptNo,
+          status: "MENUNGGU_BERKAS",
+          createdById: req.user.id,
+          catatanHasil: catatan || null
+        }
+      });
+
+      const updatedSkripsi = await tx.skripsi.update({
+        where: {
+          id: skripsiId
+        },
+        data: {
+          tahap: "SIDANG_SKRIPSI",
+          status: "MENUNGGU_SEMINAR_HASIL",
+          sidangApprovedAt: new Date()
+        },
+        include: {
+          mahasiswa: {
+            select: {
+              id: true,
+              identifier: true,
+              name: true,
+              email: true
+            }
+          },
+          peminatan: true,
+          jenisSkripsi: true,
+          dosenSkripsi: {
+            where: {
+              isActive: true
+            },
+            include: {
+              dosen: {
+                select: {
+                  id: true,
+                  identifier: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return {
+        sidang,
+        skripsi: updatedSkripsi
+      };
+    });
+
+    await createNotification({
+      userId: skripsi.mahasiswaId,
+      title: "Disetujui Maju Seminar Hasil",
+      message:
+        "Pembimbing telah menyetujui Anda untuk maju seminar hasil. Silakan upload berkas seminar hasil.",
+      type: "SEMINAR_HASIL_READY",
+      entityType: "sidang",
+      entityId: result.sidang.id
+    });
+
+    return res.json({
+      success: true,
+      message: "Mahasiswa berhasil disetujui maju seminar hasil",
+      data: result
     });
   } catch (error) {
     return next(error);

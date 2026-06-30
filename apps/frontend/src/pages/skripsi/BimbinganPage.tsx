@@ -2,11 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
-import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
-import PageHeader from "../../components/ui/PageHeader";
-import StatusBadge from "../../components/ui/StatusBadge";
-import { api } from "../../services/api";
 import {
   completeBimbingan,
   confirmBimbingan,
@@ -15,28 +10,18 @@ import {
   requestBimbingan,
   validateBimbingan
 } from "../../services/bimbingan";
+import { getBimbinganCounter } from "../../services/skripsi";
 import {
-  approveMajuSidang,
-  getBimbinganCounter,
-  getMySkripsi,
-  getSkripsiList
-} from "../../services/skripsi";
+  getWorkflowSkripsiList,
+  submitWorkflowAction,
+  type WorkflowAction,
+  type WorkflowItem,
+  type WorkflowPembimbing,
+  type WorkflowStage
+} from "../../services/workflow";
 import type { BimbinganLog } from "../../types/bimbingan";
-import type { SkripsiSummary } from "../../types/skripsi";
+import StatusBadge from "../../components/ui/StatusBadge";
 import { getApiErrorMessage } from "../../utils/apiError";
-
-type DashboardAssignment = {
-  skripsi: SkripsiSummary;
-};
-
-type DrawerMode = "request" | "detail" | null;
-
-const emptyRequestForm = {
-  dosenId: "",
-  jadwalMulai: "",
-  jadwalSelesai: "",
-  topik: ""
-};
 
 function toIsoDateTime(value: string) {
   return new Date(value).toISOString();
@@ -51,10 +36,58 @@ function formatDateTime(value?: string | null) {
   }).format(new Date(value));
 }
 
-function getLogSchedule(log: BimbinganLog) {
-  return `${formatDateTime(log.jadwalMulai)} - ${formatDateTime(
-    log.jadwalSelesai
-  )}`;
+function getBimbinganStage(workflow?: WorkflowItem | null) {
+  return workflow?.stages?.find((stage) => stage.key === "BIMBINGAN") ?? null;
+}
+
+function getPembimbingOptions(stage?: WorkflowStage | null) {
+  return (stage?.pembimbing ?? []).filter(
+    (item) => item.peran === "PEMBIMBING" && item.isActive && item.dosen
+  );
+}
+
+function getWorkflowDisplayStatus(workflow: WorkflowItem) {
+  const bimbinganStage = getBimbinganStage(workflow);
+
+  return bimbinganStage?.status || workflow.summaryStatus || workflow.skripsi.status || "-";
+}
+
+function shouldShowInBimbingan(workflow: WorkflowItem) {
+  const stage = getBimbinganStage(workflow);
+  const status = String(workflow.skripsi.status || "");
+  const tahap = String(workflow.skripsi.tahap || "");
+
+  if (stage && stage.status !== "BELUM_MULAI") return true;
+  if ((stage?.pembimbing ?? []).length > 0) return true;
+
+  return [
+    "MENUNGGU_PEMBIMBING",
+    "BIMBINGAN",
+    "MENUNGGU_SEMINAR_HASIL",
+    "SEMINAR_HASIL",
+    "MENUNGGU_KOMPRE",
+    "SIDANG_KOMPRE",
+    "MENUNGGU_SIDANG_AKHIR",
+    "SIDANG_AKHIR",
+    "LULUS_SKRIPSI",
+    "TIDAK_LULUS_SKRIPSI"
+  ].includes(status) || ["KOMPRE", "SIDANG_SKRIPSI", "FINAL"].includes(tahap);
+}
+
+function getApproveAction(workflow?: WorkflowItem | null) {
+  return (
+    workflow?.actions?.find((action) => action.key === "APPROVE_MAJU_SEMHAS") ??
+    null
+  );
+}
+
+function isActivePembimbingForUser(
+  pembimbingOptions: WorkflowPembimbing[],
+  userId?: string
+) {
+  if (!userId) return false;
+
+  return pembimbingOptions.some((item) => item.dosenId === userId);
 }
 
 export default function BimbinganPage() {
@@ -62,90 +95,65 @@ export default function BimbinganPage() {
   const queryClient = useQueryClient();
 
   const isMahasiswa = hasRole("mahasiswa");
-  const isDosen = hasRole([
-    "dosen_pembimbing",
-    "dosen_penguji",
-    "dosen_koordinator"
-  ]);
+  const isDosenPembimbing = hasRole("dosen_pembimbing");
+  const isDosenKoordinator = hasRole("dosen_koordinator");
+  const isKetuaProdi = hasRole("ketua_prodi");
+  const isAdmin = hasRole("admin");
+  const isStaf = hasRole("staf_prodi");
 
-  const canManageBimbingan = hasRole([
-    "admin",
-    "dosen_koordinator",
-    "ketua_prodi",
-    "staf_prodi"
-  ]);
+  const canMonitorBimbingan =
+    isAdmin || isDosenKoordinator || isKetuaProdi || isStaf;
 
   const [selectedSkripsiId, setSelectedSkripsiId] = useState("");
-  const [drawerMode, setDrawerMode] = useState<DrawerMode>(null);
-  const [selectedLog, setSelectedLog] = useState<BimbinganLog | null>(null);
-
-  const [requestForm, setRequestForm] = useState(emptyRequestForm);
-  const [catatanDosen, setCatatanDosen] = useState("");
-  const [hasilBimbingan, setHasilBimbingan] = useState("");
-  const [catatanMahasiswa, setCatatanMahasiswa] = useState("");
-
-  const [pageError, setPageError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const mySkripsiQuery = useQuery({
-    queryKey: ["my-skripsi"],
-    queryFn: getMySkripsi
+  const [requestForm, setRequestForm] = useState({
+    dosenId: "",
+    jadwalMulai: "",
+    jadwalSelesai: "",
+    topik: ""
   });
 
-  const managedSkripsiQuery = useQuery({
-    queryKey: ["managed-skripsi-for-bimbingan"],
+  const workflowQuery = useQuery({
+    queryKey: ["workflow-skripsi-list-for-bimbingan"],
     queryFn: () =>
-      getSkripsiList({
+      getWorkflowSkripsiList({
         limit: 100
-      }),
-    enabled: canManageBimbingan
+      })
   });
 
-  const dashboardQuery = useQuery({
-    queryKey: ["dashboard-summary-for-bimbingan"],
-    queryFn: async () => {
-      const response = await api.get("/dashboard/my-summary");
-      return response.data.data;
-    }
-  });
+  const workflowRows = workflowQuery.data?.data ?? [];
 
-  const dosenAssignments: DashboardAssignment[] =
-    dashboardQuery.data?.assignments ?? [];
+  const workflowOptions = useMemo(() => {
+    const filtered = workflowRows.filter(shouldShowInBimbingan);
 
-  const skripsiOptions: SkripsiSummary[] = useMemo(() => {
-    if (isMahasiswa) {
-      return mySkripsiQuery.data ?? [];
+    if (filtered.length > 0) {
+      return filtered;
     }
 
-    if (canManageBimbingan) {
-      return (managedSkripsiQuery.data?.data ?? []).filter((item) =>
-        ["KOMPRE", "SIDANG_SKRIPSI"].includes(item.tahap || "")
-      ) as SkripsiSummary[];
-    }
-
-    if (isDosen) {
-      return dosenAssignments.map((item) => item.skripsi);
-    }
-
-    return [];
-  }, [
-    isMahasiswa,
-    isDosen,
-    canManageBimbingan,
-    mySkripsiQuery.data,
-    managedSkripsiQuery.data,
-    dosenAssignments
-  ]);
+    return workflowRows;
+  }, [workflowRows]);
 
   useEffect(() => {
-    if (!selectedSkripsiId && skripsiOptions.length > 0) {
-      setSelectedSkripsiId(skripsiOptions[0].id);
+    if (!selectedSkripsiId && workflowOptions.length > 0) {
+      setSelectedSkripsiId(workflowOptions[0].skripsi.id);
     }
-  }, [selectedSkripsiId, skripsiOptions]);
 
-  const selectedSkripsi = skripsiOptions.find(
-    (item) => item.id === selectedSkripsiId
+    if (
+      selectedSkripsiId &&
+      workflowOptions.length > 0 &&
+      !workflowOptions.some((item) => item.skripsi.id === selectedSkripsiId)
+    ) {
+      setSelectedSkripsiId(workflowOptions[0].skripsi.id);
+    }
+  }, [selectedSkripsiId, workflowOptions]);
+
+  const selectedWorkflow = workflowOptions.find(
+    (item) => item.skripsi.id === selectedSkripsiId
   );
+
+  const selectedSkripsi = selectedWorkflow?.skripsi ?? null;
+  const bimbinganStage = getBimbinganStage(selectedWorkflow);
+  const pembimbingOptions = getPembimbingOptions(bimbinganStage);
+  const approveAction = getApproveAction(selectedWorkflow);
 
   const bimbinganQuery = useQuery({
     queryKey: ["bimbingan", selectedSkripsiId],
@@ -159,694 +167,551 @@ export default function BimbinganPage() {
     enabled: Boolean(selectedSkripsiId)
   });
 
-  const logs: BimbinganLog[] = bimbinganQuery.data?.data ?? [];
-
-  const validCount =
-    counterQuery.data?.validCount ?? bimbinganQuery.data?.meta?.validCount ?? 0;
-
-  const requiredCount =
-    counterQuery.data?.requiredCount ??
-    bimbinganQuery.data?.meta?.requiredCount ??
-    8;
-
-  const canRequestSidang =
-    counterQuery.data?.canRequestSidang ??
-    bimbinganQuery.data?.meta?.canRequestSidang ??
-    validCount >= requiredCount;
-
-  const percentage = Math.min(
-    Math.round((validCount / requiredCount) * 100),
-    100
-  );
-
-  const pembimbingOptions =
-    selectedSkripsi?.dosenSkripsi?.filter(
-      (item) => item.peran === "PEMBIMBING" && item.isActive
-    ) ?? [];
-
-  const isSelectedFromDosenAssignments = Boolean(
-    selectedSkripsi &&
-      dosenAssignments.some((item) => item.skripsi.id === selectedSkripsi.id)
-  );
-
-  const isPembimbingAktifUntukSkripsi =
-    pembimbingOptions.some((item) => item.dosen?.id === user?.id) ||
-    (isSelectedFromDosenAssignments &&
-      hasRole("dosen_pembimbing") &&
-      !canManageBimbingan);
-
-  const canApproveMajuSidang =
-    canRequestSidang &&
-    isPembimbingAktifUntukSkripsi &&
-    selectedSkripsi?.status !== "MENUNGGU_JADWAL";
-
   const requestMutation = useMutation({
     mutationFn: () =>
       requestBimbingan(selectedSkripsiId, {
         dosenId: requestForm.dosenId,
         jadwalMulai: toIsoDateTime(requestForm.jadwalMulai),
         jadwalSelesai: toIsoDateTime(requestForm.jadwalSelesai),
-        topik: requestForm.topik.trim()
+        topik: requestForm.topik
       }),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["bimbingan"] }),
-        queryClient.invalidateQueries({ queryKey: ["bimbingan-counter"] })
+        queryClient.invalidateQueries({ queryKey: ["bimbingan-counter"] }),
+        queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] }),
+        queryClient.invalidateQueries({ queryKey: ["workflow-skripsi"] })
       ]);
 
-      setRequestForm(emptyRequestForm);
-      closeDrawer();
-      setPageError("");
-      setSuccessMessage("Pengajuan bimbingan berhasil dibuat.");
+      setRequestForm({
+        dosenId: "",
+        jadwalMulai: "",
+        jadwalSelesai: "",
+        topik: ""
+      });
     },
     onError: (error) => {
-      setSuccessMessage("");
-      setPageError(
-        getApiErrorMessage(
-          error,
-          "Gagal mengajukan bimbingan. Pastikan dosen pembimbing dan jadwal valid."
-        )
-      );
+      alert(getApiErrorMessage(error, "Gagal mengajukan bimbingan."));
     }
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: ({
+      id,
+      catatanDosen
+    }: {
+      id: string;
+      catatanDosen?: string;
+    }) =>
       confirmBimbingan(id, {
-        catatanDosen: catatanDosen.trim() || undefined
+        catatanDosen
       }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
-
-      closeDrawer();
-      setSuccessMessage("Pengajuan bimbingan berhasil disetujui.");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] });
     },
     onError: (error) => {
-      setSuccessMessage("");
-      setPageError(getApiErrorMessage(error, "Gagal menyetujui bimbingan."));
+      alert(getApiErrorMessage(error, "Gagal menyetujui bimbingan."));
     }
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: ({
+      id,
+      catatanDosen
+    }: {
+      id: string;
+      catatanDosen?: string;
+    }) =>
       rejectBimbingan(id, {
-        catatanDosen: catatanDosen.trim() || undefined
+        catatanDosen
       }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
-
-      closeDrawer();
-      setSuccessMessage("Pengajuan bimbingan berhasil ditolak.");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] });
     },
     onError: (error) => {
-      setSuccessMessage("");
-      setPageError(getApiErrorMessage(error, "Gagal menolak bimbingan."));
+      alert(getApiErrorMessage(error, "Gagal menolak bimbingan."));
     }
   });
 
   const completeMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: ({
+      id,
+      hasil,
+      catatanDosen
+    }: {
+      id: string;
+      hasil: string;
+      catatanDosen?: string;
+    }) =>
       completeBimbingan(id, {
-        hasil: hasilBimbingan.trim(),
-        catatanDosen: catatanDosen.trim() || undefined
+        hasil,
+        catatanDosen
       }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
-
-      closeDrawer();
-      setSuccessMessage("Hasil bimbingan berhasil disimpan.");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] });
     },
     onError: (error) => {
-      setSuccessMessage("");
-      setPageError(getApiErrorMessage(error, "Gagal menyimpan hasil bimbingan."));
+      alert(getApiErrorMessage(error, "Gagal mengisi hasil bimbingan."));
     }
   });
 
   const validateMutation = useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: ({
+      id,
+      catatanMahasiswa
+    }: {
+      id: string;
+      catatanMahasiswa?: string;
+    }) =>
       validateBimbingan(id, {
-        catatanMahasiswa: catatanMahasiswa.trim() || undefined
+        catatanMahasiswa
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
+      queryClient.invalidateQueries({ queryKey: ["bimbingan-counter"] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi"] });
+    },
+    onError: (error) => {
+      alert(getApiErrorMessage(error, "Gagal memvalidasi bimbingan."));
+    }
+  });
+
+  const approveSemhasMutation = useMutation({
+    mutationFn: (action: WorkflowAction) => submitWorkflowAction(action, {}),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["bimbingan"] }),
         queryClient.invalidateQueries({ queryKey: ["bimbingan-counter"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-gamification-dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] }),
+        queryClient.invalidateQueries({ queryKey: ["workflow-skripsi"] })
       ]);
 
-      closeDrawer();
-      setSuccessMessage("Bimbingan berhasil dikonfirmasi mahasiswa.");
+      alert("Mahasiswa berhasil disetujui maju Seminar Hasil.");
     },
     onError: (error) => {
-      setSuccessMessage("");
-      setPageError(
-        getApiErrorMessage(error, "Gagal mengonfirmasi bimbingan.")
-      );
+      alert(getApiErrorMessage(error, "Gagal approve maju Seminar Hasil."));
     }
   });
 
-  const approveSidangMutation = useMutation({
-    mutationFn: (skripsiId: string) => approveMajuSidang(skripsiId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["bimbingan"] }),
-        queryClient.invalidateQueries({ queryKey: ["bimbingan-counter"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-skripsi"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["dashboard-summary-for-bimbingan"]
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["managed-skripsi-for-bimbingan"]
-        })
-      ]);
+  const logs: BimbinganLog[] = bimbinganQuery.data?.data ?? [];
 
-      setPageError("");
-      setSuccessMessage(
-        "Mahasiswa berhasil disetujui maju sidang. Status berubah menjadi MENUNGGU_JADWAL."
-      );
-    },
-    onError: (error) => {
-      setSuccessMessage("");
-      setPageError(getApiErrorMessage(error, "Gagal approve maju sidang."));
-    }
-  });
+  const validCount =
+    bimbinganStage?.progress?.validCount ??
+    counterQuery.data?.validCount ??
+    bimbinganQuery.data?.meta?.validCount ??
+    0;
 
-  function closeDrawer() {
-    setDrawerMode(null);
-    setSelectedLog(null);
-    setCatatanDosen("");
-    setHasilBimbingan("");
-    setCatatanMahasiswa("");
-    setPageError("");
-  }
+  const requiredCount =
+    bimbinganStage?.progress?.requiredCount ??
+    counterQuery.data?.requiredCount ??
+    bimbinganQuery.data?.meta?.requiredCount ??
+    8;
 
-  function openRequestDrawer() {
-    setDrawerMode("request");
-    setSelectedLog(null);
-    setCatatanDosen("");
-    setHasilBimbingan("");
-    setCatatanMahasiswa("");
-    setPageError("");
-    setSuccessMessage("");
-  }
+  const totalCount =
+    bimbinganStage?.progress?.totalCount ??
+    logs.length;
 
-  function openDetailDrawer(log: BimbinganLog) {
-    setSelectedLog(log);
-    setDrawerMode("detail");
-    setCatatanDosen(log.catatanDosen || "");
-    setHasilBimbingan(log.hasil || "");
-    setCatatanMahasiswa(log.catatanMahasiswa || "");
-    setPageError("");
-    setSuccessMessage("");
-  }
+  const canRequestSemhas =
+    bimbinganStage?.progress
+      ? validCount >= requiredCount
+      : counterQuery.data?.canRequestSidang ??
+        bimbinganQuery.data?.meta?.canRequestSidang ??
+        validCount >= requiredCount;
+
+  const percentage = Math.min(
+    Math.round((validCount / Math.max(requiredCount, 1)) * 100),
+    100
+  );
+
+  const isPembimbingAktifUntukSkripsi = isActivePembimbingForUser(
+    pembimbingOptions,
+    user?.id
+  );
+
+  const canMahasiswaRequest =
+    isMahasiswa &&
+    selectedSkripsi &&
+    pembimbingOptions.length > 0 &&
+    !["LULUS_SKRIPSI", "TIDAK_LULUS_SKRIPSI", "SELESAI"].includes(
+      String(selectedSkripsi.status || "")
+    );
 
   function handleRequestSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!selectedSkripsiId) {
-      setPageError("Pilih skripsi terlebih dahulu.");
-      return;
-    }
-
-    if (!requestForm.dosenId) {
-      setPageError("Pilih dosen pembimbing terlebih dahulu.");
-      return;
-    }
-
-    if (
-      new Date(requestForm.jadwalSelesai).getTime() <=
-      new Date(requestForm.jadwalMulai).getTime()
-    ) {
-      setPageError("Jadwal selesai harus lebih besar dari jadwal mulai.");
-      return;
-    }
-
     requestMutation.mutate();
+  }
+
+  function handleConfirm(log: BimbinganLog) {
+    const catatanDosen =
+      window.prompt("Catatan dosen untuk persetujuan bimbingan:", "") || "";
+
+    confirmMutation.mutate({
+      id: log.id,
+      catatanDosen
+    });
+  }
+
+  function handleReject(log: BimbinganLog) {
+    const catatanDosen =
+      window.prompt("Alasan penolakan pengajuan bimbingan:", "") || "";
+
+    rejectMutation.mutate({
+      id: log.id,
+      catatanDosen
+    });
+  }
+
+  function handleComplete(log: BimbinganLog) {
+    const hasil = window.prompt("Isi hasil bimbingan:", "");
+
+    if (!hasil) {
+      return;
+    }
+
+    const catatanDosen =
+      window.prompt("Catatan tambahan dosen:", "") || "";
+
+    completeMutation.mutate({
+      id: log.id,
+      hasil,
+      catatanDosen
+    });
+  }
+
+  function handleValidate(log: BimbinganLog) {
+    const catatanMahasiswa =
+      window.prompt("Catatan konfirmasi mahasiswa:", "") || "";
+
+    validateMutation.mutate({
+      id: log.id,
+      catatanMahasiswa
+    });
   }
 
   return (
     <section className="page-stack">
-      <PageHeader
-        eyebrow="Bimbingan"
-        title="Bimbingan Skripsi"
-        description="Ajukan bimbingan, validasi hasil bimbingan, dan pantau syarat minimal 8x bimbingan valid."
-      />
+      <div>
+        <p className="eyebrow">Bimbingan</p>
+        <h1>Bimbingan Skripsi</h1>
+        <p className="muted">
+          Data bimbingan sekarang mengikuti Workflow Sidang, sehingga mahasiswa,
+          pembimbing, koordinator, kaprodi, admin, dan staf melihat data sesuai
+          role masing-masing.
+        </p>
+      </div>
 
-      {successMessage ? (
-        <div className="state-card success">{successMessage}</div>
+      {workflowQuery.isError ? (
+        <div className="alert-error">
+          {getApiErrorMessage(
+            workflowQuery.error,
+            "Gagal memuat data workflow bimbingan."
+          )}
+        </div>
       ) : null}
 
-      {pageError && !drawerMode ? (
-        <div className="alert-error">{pageError}</div>
-      ) : null}
+      <section className="card form-stack">
+        <label>
+          <span>Pilih Skripsi</span>
+          <select
+            value={selectedSkripsiId}
+            onChange={(event) => setSelectedSkripsiId(event.target.value)}
+          >
+            {workflowOptions.length === 0 ? (
+              <option value="">Belum ada skripsi bimbingan</option>
+            ) : (
+              workflowOptions.map((workflow) => (
+                <option key={workflow.skripsi.id} value={workflow.skripsi.id}>
+                  {workflow.skripsi.mahasiswa?.identifier || "-"} •{" "}
+                  {workflow.skripsi.mahasiswa?.name || "-"} —{" "}
+                  {workflow.skripsi.title || "Tanpa judul"}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
 
-      <section className="list-card bimbingan-summary-card">
-        <div className="bimbingan-summary-grid">
-          <label>
-            <span>Pilih Skripsi</span>
-            <select
-              value={selectedSkripsiId}
-              onChange={(event) => {
-                setSelectedSkripsiId(event.target.value);
-                setPageError("");
-                setSuccessMessage("");
-              }}
-            >
-              {skripsiOptions.length === 0 ? (
-                <option value="">Belum ada skripsi</option>
-              ) : (
-                skripsiOptions.map((skripsi) => (
-                  <option key={skripsi.id} value={skripsi.id}>
-                    {skripsi.title || "Tanpa judul"} — {skripsi.status}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
+        {workflowQuery.isLoading ? (
+          <p>Memuat data workflow...</p>
+        ) : null}
 
-          <div className="bimbingan-progress-panel">
-            <div className="progress-summary-head">
+        {selectedWorkflow && selectedSkripsi ? (
+          <div className="progress-card">
+            <div className="page-header-row">
               <div>
+                <strong>{selectedSkripsi.title || "Tanpa judul"}</strong>
+                <p className="muted">
+                  {selectedSkripsi.mahasiswa?.identifier || "-"} •{" "}
+                  {selectedSkripsi.mahasiswa?.name || "-"}
+                </p>
+                <p className="muted">
+                  Tahap: {selectedSkripsi.tahap || "-"} • Status:{" "}
+                  {selectedSkripsi.status || "-"} • Workflow:{" "}
+                  {getWorkflowDisplayStatus(selectedWorkflow)}
+                </p>
+              </div>
+
+              <div className="row-inline">
+                <StatusBadge value={getWorkflowDisplayStatus(selectedWorkflow)} />
                 <strong>
                   {validCount}/{requiredCount}
                 </strong>
-                <span>Bimbingan tervalidasi</span>
               </div>
-
-              <StatusBadge
-                value={canRequestSidang ? "SIAP_MAJU_SIDANG" : "BELUM_SIAP"}
-                size="sm"
-              />
             </div>
 
-            <div className="progress-bar-shell">
-              <div
-                className="progress-bar-value"
-                style={{ width: `${percentage}%` }}
-              />
+            <div className="progress-bar">
+              <span style={{ width: `${percentage}%` }} />
             </div>
 
-            <div className="bimbingan-summary-meta">
-              <span>Progress {percentage}%</span>
-              <span>Pembimbing aktif {pembimbingOptions.length}</span>
-              <span>Status {selectedSkripsi?.status || "-"}</span>
+            <div className="mini-grid">
+              <span>Total log: {totalCount}</span>
+              <span>Valid: {validCount}</span>
+              <span>Syarat: {requiredCount}</span>
+              <span>Progress: {percentage}%</span>
+              <span>
+                Seminar Hasil: {canRequestSemhas ? "Siap" : "Belum siap"}
+              </span>
+              <span>Pembimbing: {pembimbingOptions.length}</span>
             </div>
-          </div>
 
-          <div className="bimbingan-summary-actions">
-            {selectedSkripsi?.status === "MENUNGGU_JADWAL" ? (
-              <div className="state-card success">Sudah menunggu jadwal.</div>
-            ) : canRequestSidang ? (
-              canApproveMajuSidang ? (
+            {pembimbingOptions.length > 0 ? (
+              <div className="state-card">
+                <strong>Pembimbing aktif</strong>
+                <div className="mini-grid">
+                  {pembimbingOptions.map((item) => (
+                    <span key={item.id}>
+                      {item.dosen?.identifier || "-"} • {item.dosen?.name || "-"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="alert-error">
+                Dosen pembimbing belum ditentukan. Koordinator/Kaprodi perlu
+                assign pembimbing terlebih dahulu.
+              </div>
+            )}
+
+            {canRequestSemhas ? (
+              approveAction ? (
                 <button
                   type="button"
                   className="primary-button"
-                  disabled={approveSidangMutation.isPending}
-                  onClick={() =>
-                    selectedSkripsi &&
-                    approveSidangMutation.mutate(selectedSkripsi.id)
-                  }
+                  disabled={approveSemhasMutation.isPending}
+                  onClick={() => approveSemhasMutation.mutate(approveAction)}
                 >
-                  {approveSidangMutation.isPending
+                  {approveSemhasMutation.isPending
                     ? "Memproses..."
-                    : "Approve Maju Sidang"}
+                    : "Approve Maju Seminar Hasil"}
                 </button>
               ) : (
                 <div className="state-card success">
-                  8/8 bimbingan sudah tervalidasi. Approval hanya dapat
-                  dilakukan oleh dosen pembimbing aktif.
+                  Syarat bimbingan sudah cukup. Tombol approve hanya tampil untuk
+                  dosen pembimbing aktif yang berwenang.
                 </div>
               )
             ) : (
               <div className="state-card">
-                Butuh {Math.max(requiredCount - validCount, 0)} bimbingan
-                tervalidasi lagi.
+                Butuh {Math.max(requiredCount - validCount, 0)} bimbingan valid
+                lagi sebelum maju Seminar Hasil.
               </div>
             )}
           </div>
-        </div>
-      </section>
-
-      <section className="list-card bimbingan-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Riwayat Bimbingan</h2>
-            <p className="muted">
-              List pengajuan dan hasil bimbingan berdasarkan skripsi terpilih.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            {isMahasiswa ? (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={openRequestDrawer}
-                disabled={!selectedSkripsi || pembimbingOptions.length === 0}
-              >
-                Ajukan Bimbingan
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {!selectedSkripsi ? (
-          <EmptyState
-            title="Belum ada skripsi"
-            description="Pilih atau buat skripsi terlebih dahulu."
-          />
-        ) : bimbinganQuery.isLoading ? (
-          <EmptyState
-            title="Memuat bimbingan..."
-            description="Mohon tunggu sebentar."
-          />
         ) : (
-          <DataTable
-            data={logs}
-            emptyMessage="Belum ada riwayat bimbingan"
-            columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (_item, index) => index + 1
-              },
-              {
-                key: "topik",
-                header: "Topik",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.topik || "-"}</strong>
-                    <span>{getLogSchedule(item)}</span>
-                  </div>
-                )
-              },
-              {
-                key: "mahasiswa",
-                header: "Mahasiswa",
-                render: (item) => item.mahasiswa?.name || "-"
-              },
-              {
-                key: "dosen",
-                header: "Dosen",
-                render: (item) => item.dosen?.name || "-"
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (item) => <StatusBadge value={item.status} size="sm" />
-              },
-              {
-                key: "hasil",
-                header: "Hasil",
-                render: (item) => item.hasil || "-"
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (item) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => openDetailDrawer(item)}
-                    >
-                      Detail
-                    </button>
-                  </div>
-                )
-              }
-            ]}
-          />
+          <div className="state-card">
+            Belum ada skripsi yang masuk tahap bimbingan untuk role Anda.
+          </div>
         )}
       </section>
 
-      {drawerMode ? (
-        <div className="crud-drawer-backdrop" role="presentation">
-          <aside
-            className="crud-drawer bimbingan-drawer"
-            aria-label="Form bimbingan"
+      {canMahasiswaRequest ? (
+        <form className="card form-stack" onSubmit={handleRequestSubmit}>
+          <h2>Ajukan Bimbingan</h2>
+
+          <label>
+            <span>Dosen Pembimbing</span>
+            <select
+              value={requestForm.dosenId}
+              onChange={(event) =>
+                setRequestForm((current) => ({
+                  ...current,
+                  dosenId: event.target.value
+                }))
+              }
+              required
+            >
+              <option value="">Pilih dosen pembimbing</option>
+              {pembimbingOptions.map((item) => (
+                <option key={item.dosenId} value={item.dosenId}>
+                  {item.dosen?.name || item.dosenId}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <section className="two-column compact">
+            <label>
+              <span>Jadwal Mulai</span>
+              <input
+                type="datetime-local"
+                value={requestForm.jadwalMulai}
+                onChange={(event) =>
+                  setRequestForm((current) => ({
+                    ...current,
+                    jadwalMulai: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+
+            <label>
+              <span>Jadwal Selesai</span>
+              <input
+                type="datetime-local"
+                value={requestForm.jadwalSelesai}
+                onChange={(event) =>
+                  setRequestForm((current) => ({
+                    ...current,
+                    jadwalSelesai: event.target.value
+                  }))
+                }
+                required
+              />
+            </label>
+          </section>
+
+          <label>
+            <span>Topik Bimbingan</span>
+            <textarea
+              value={requestForm.topik}
+              onChange={(event) =>
+                setRequestForm((current) => ({
+                  ...current,
+                  topik: event.target.value
+                }))
+              }
+              placeholder="Contoh: Diskusi Bab 1 dan rumusan masalah"
+              required
+            />
+          </label>
+
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={
+              requestMutation.isPending ||
+              !selectedSkripsiId ||
+              pembimbingOptions.length === 0
+            }
           >
-            <div className="crud-drawer-head">
-              <div>
-                <p className="eyebrow">
-                  {drawerMode === "request" ? "Tambah Data" : "Detail Data"}
-                </p>
-                <h2>
-                  {drawerMode === "request"
-                    ? "Ajukan Bimbingan"
-                    : "Detail Bimbingan"}
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={closeDrawer}
-              >
-                Tutup
-              </button>
-            </div>
-
-            {pageError ? <div className="alert-error">{pageError}</div> : null}
-
-            {drawerMode === "request" ? (
-              <form className="form-stack" onSubmit={handleRequestSubmit}>
-                {pembimbingOptions.length === 0 ? (
-                  <div className="alert-error">
-                    Dosen pembimbing belum ditentukan. Hubungi koordinator atau
-                    admin untuk assign pembimbing terlebih dahulu.
-                  </div>
-                ) : null}
-
-                <label>
-                  <span>Dosen Pembimbing</span>
-                  <select
-                    value={requestForm.dosenId}
-                    onChange={(event) =>
-                      setRequestForm((current) => ({
-                        ...current,
-                        dosenId: event.target.value
-                      }))
-                    }
-                    required
-                  >
-                    <option value="">Pilih dosen pembimbing</option>
-                    {pembimbingOptions.map((item) => (
-                      <option key={item.dosen.id} value={item.dosen.id}>
-                        {item.dosen.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  <span>Jadwal Mulai</span>
-                  <input
-                    type="datetime-local"
-                    value={requestForm.jadwalMulai}
-                    onChange={(event) =>
-                      setRequestForm((current) => ({
-                        ...current,
-                        jadwalMulai: event.target.value
-                      }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label>
-                  <span>Jadwal Selesai</span>
-                  <input
-                    type="datetime-local"
-                    value={requestForm.jadwalSelesai}
-                    onChange={(event) =>
-                      setRequestForm((current) => ({
-                        ...current,
-                        jadwalSelesai: event.target.value
-                      }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label>
-                  <span>Topik Bimbingan</span>
-                  <textarea
-                    value={requestForm.topik}
-                    onChange={(event) =>
-                      setRequestForm((current) => ({
-                        ...current,
-                        topik: event.target.value
-                      }))
-                    }
-                    placeholder="Contoh: Diskusi Bab 1 dan rumusan masalah"
-                    required
-                  />
-                </label>
-
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={
-                    requestMutation.isPending ||
-                    !selectedSkripsiId ||
-                    pembimbingOptions.length === 0
-                  }
-                >
-                  {requestMutation.isPending
-                    ? "Mengajukan..."
-                    : "Ajukan Bimbingan"}
-                </button>
-              </form>
-            ) : selectedLog ? (
-              <div className="bimbingan-detail-stack">
-                <div className="skripsi-detail-title">
-                  <strong>{selectedLog.topik || "-"}</strong>
-                  <StatusBadge value={selectedLog.status} />
-                </div>
-
-                <div className="info-list">
-                  <div className="info-row">
-                    <span>Jadwal</span>
-                    <strong>{getLogSchedule(selectedLog)}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Mahasiswa</span>
-                    <strong>{selectedLog.mahasiswa?.name || "-"}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Dosen</span>
-                    <strong>{selectedLog.dosen?.name || "-"}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Hasil</span>
-                    <p>{selectedLog.hasil || "-"}</p>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Catatan Dosen</span>
-                    <p>{selectedLog.catatanDosen || "-"}</p>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Catatan Mahasiswa</span>
-                    <p>{selectedLog.catatanMahasiswa || "-"}</p>
-                  </div>
-                </div>
-
-                {isDosen && selectedLog.status === "DIAJUKAN" ? (
-                  <div className="drawer-section">
-                    <h3>Review Pengajuan</h3>
-
-                    <label>
-                      <span>Catatan Dosen</span>
-                      <textarea
-                        value={catatanDosen}
-                        onChange={(event) => setCatatanDosen(event.target.value)}
-                        placeholder="Catatan persetujuan atau alasan penolakan"
-                      />
-                    </label>
-
-                    <div className="page-actions">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={confirmMutation.isPending}
-                        onClick={() => confirmMutation.mutate(selectedLog.id)}
-                      >
-                        Setujui
-                      </button>
-
-                      <button
-                        type="button"
-                        className="danger-button"
-                        disabled={rejectMutation.isPending}
-                        onClick={() => rejectMutation.mutate(selectedLog.id)}
-                      >
-                        Tolak
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {isDosen && selectedLog.status === "DISETUJUI" ? (
-                  <div className="drawer-section">
-                    <h3>Isi Hasil Bimbingan</h3>
-
-                    <label>
-                      <span>Hasil Bimbingan</span>
-                      <textarea
-                        value={hasilBimbingan}
-                        onChange={(event) =>
-                          setHasilBimbingan(event.target.value)
-                        }
-                        placeholder="Tuliskan hasil bimbingan"
-                        required
-                      />
-                    </label>
-
-                    <label>
-                      <span>Catatan Dosen</span>
-                      <textarea
-                        value={catatanDosen}
-                        onChange={(event) => setCatatanDosen(event.target.value)}
-                        placeholder="Catatan tambahan dosen"
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={
-                        completeMutation.isPending || !hasilBimbingan.trim()
-                      }
-                      onClick={() => completeMutation.mutate(selectedLog.id)}
-                    >
-                      {completeMutation.isPending
-                        ? "Menyimpan..."
-                        : "Simpan Hasil Bimbingan"}
-                    </button>
-                  </div>
-                ) : null}
-
-                {isMahasiswa && selectedLog.status === "SELESAI" ? (
-                  <div className="drawer-section">
-                    <h3>Konfirmasi Mahasiswa</h3>
-
-                    <label>
-                      <span>Catatan Mahasiswa</span>
-                      <textarea
-                        value={catatanMahasiswa}
-                        onChange={(event) =>
-                          setCatatanMahasiswa(event.target.value)
-                        }
-                        placeholder="Catatan konfirmasi mahasiswa"
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={validateMutation.isPending}
-                      onClick={() => validateMutation.mutate(selectedLog.id)}
-                    >
-                      {validateMutation.isPending
-                        ? "Memproses..."
-                        : "Konfirmasi Bimbingan"}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </aside>
-        </div>
+            {requestMutation.isPending ? "Mengajukan..." : "Ajukan Bimbingan"}
+          </button>
+        </form>
       ) : null}
+
+      <section className="list-card">
+        <div className="page-header-row">
+          <div>
+            <h2>Riwayat Bimbingan</h2>
+            <p className="muted">
+              Mahasiswa mengajukan, pembimbing menyetujui dan mengisi hasil,
+              lalu mahasiswa memvalidasi agar masuk counter.
+            </p>
+          </div>
+
+          {canMonitorBimbingan ? (
+            <StatusBadge value="MONITORING" size="sm" />
+          ) : null}
+        </div>
+
+        {bimbinganQuery.isError ? (
+          <div className="alert-error">
+            {getApiErrorMessage(
+              bimbinganQuery.error,
+              "Gagal memuat riwayat bimbingan."
+            )}
+          </div>
+        ) : bimbinganQuery.isLoading ? (
+          <p>Memuat bimbingan...</p>
+        ) : logs.length === 0 ? (
+          <p>Belum ada riwayat bimbingan.</p>
+        ) : (
+          logs.map((log) => (
+            <article key={log.id} className="academic-card">
+              <div className="page-header-row">
+                <div>
+                  <strong>{log.topik}</strong>
+                  <p className="muted">
+                    {formatDateTime(log.jadwalMulai)} -{" "}
+                    {formatDateTime(log.jadwalSelesai)}
+                  </p>
+                  <small>
+                    Mahasiswa: {log.mahasiswa?.name || "-"} • Dosen:{" "}
+                    {log.dosen?.name || "-"}
+                  </small>
+                </div>
+
+                <StatusBadge value={log.status} size="sm" />
+              </div>
+
+              <div className="mini-grid">
+                <span>Hasil: {log.hasil || "-"}</span>
+                <span>Catatan dosen: {log.catatanDosen || "-"}</span>
+                <span>Catatan mahasiswa: {log.catatanMahasiswa || "-"}</span>
+              </div>
+
+              <div className="row-inline">
+                {isDosenPembimbing &&
+                isPembimbingAktifUntukSkripsi &&
+                log.status === "DIAJUKAN" ? (
+                  <>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => handleConfirm(log)}
+                    >
+                      Setujui
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => handleReject(log)}
+                    >
+                      Tolak
+                    </button>
+                  </>
+                ) : null}
+
+                {isDosenPembimbing &&
+                isPembimbingAktifUntukSkripsi &&
+                log.status === "DISETUJUI" ? (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => handleComplete(log)}
+                  >
+                    Isi Hasil Bimbingan
+                  </button>
+                ) : null}
+
+                {isMahasiswa && log.status === "SELESAI" ? (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => handleValidate(log)}
+                  >
+                    Konfirmasi Bimbingan
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))
+        )}
+      </section>
     </section>
   );
 }

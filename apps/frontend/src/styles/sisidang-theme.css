@@ -333,6 +333,55 @@ button:disabled {
   display: none;
 }
 
+.upload-inline-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.upload-inline-button input,
+.upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.file-row > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.file-row small {
+  color: var(--muted);
+}
+
+@media (max-width: 680px) {
+  .file-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 /* =========================================================
    Forms
    ========================================================= */
@@ -4122,4 +4171,967 @@ body,
   .skripsi-drawer .file-row-actions .upload-button {
     width: 100%;
   }
+}
+
+.compact-check-grid {
+  max-height: 220px;
+  overflow: auto;
+  min-width: 280px;
+}
+
+.workflow-history-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.workflow-history-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.workflow-history-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workflow-history-head h2 {
+  margin: 0.2rem 0;
+  font-size: 1.1rem;
+}
+
+.workflow-final-status {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.workflow-final-status strong {
+  font-size: 1.4rem;
+  color: var(--primary);
+}
+
+.workflow-progress-track {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.workflow-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+}
+
+@media (max-width: 720px) {
+  .workflow-history-head {
+    flex-direction: column;
+  }
+
+  .workflow-final-status {
+    justify-items: start;
+  }
+}
+
+.workflow-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.workflow-metric-card,
+.workflow-shortcut-card,
+.workflow-dashboard-panel,
+.workflow-student-card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.workflow-metric-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+}
+
+.workflow-metric-card span,
+.workflow-metric-card p,
+.workflow-stage-row span,
+.workflow-mini-row span,
+.workflow-mini-row small,
+.workflow-student-card span,
+.workflow-student-card small {
+  color: var(--muted);
+}
+
+.workflow-metric-card strong {
+  font-size: 2rem;
+  color: var(--primary);
+}
+
+.workflow-metric-card p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.workflow-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.workflow-shortcut-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.workflow-shortcut-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.workflow-shortcut-card span {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.workflow-shortcut-card small {
+  color: var(--muted);
+}
+
+.workflow-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1rem;
+}
+
+.workflow-dashboard-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.workflow-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workflow-panel-head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.workflow-panel-head input {
+  min-width: 280px;
+}
+
+.workflow-stage-list,
+.workflow-mini-list,
+.workflow-student-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.workflow-stage-row {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.workflow-stage-row > div:first-child,
+.workflow-mini-row,
+.workflow-student-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workflow-mini-row {
+  align-items: center;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.workflow-mini-row > div,
+.workflow-student-card > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.workflow-mini-row > div:last-child,
+.workflow-student-card > div:last-child {
+  justify-items: end;
+}
+
+.workflow-student-card {
+  align-items: center;
+  padding: 0.85rem;
+}
+
+.workflow-student-card strong:last-child {
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+@media (max-width: 1100px) {
+  .workflow-metric-grid,
+  .workflow-shortcut-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .workflow-metric-grid,
+  .workflow-shortcut-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-panel-head,
+  .workflow-stage-row > div:first-child,
+  .workflow-mini-row,
+  .workflow-student-card {
+    flex-direction: column;
+  }
+
+  .workflow-panel-head input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .workflow-mini-row > div:last-child,
+  .workflow-student-card > div:last-child {
+    justify-items: start;
+  }
+}
+.sidebar-menu-group {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.35rem 0;
+}
+
+.sidebar-menu-group + .sidebar-menu-group {
+  margin-top: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.sidebar-menu-group-title {
+  margin: 0;
+  padding: 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-menu-group-list {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.sidebar-link-icon {
+  display: inline-flex;
+  width: 1.35rem;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-link-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   Phase 6-G1 Public dashboard schedule polish
+   ========================================================= */
+
+.public-schedule-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.public-schedule-summary-grid article {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.public-schedule-summary-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.public-schedule-summary-grid strong {
+  color: var(--up-blue-950);
+  font-size: 1.55rem;
+}
+
+.public-filter-toolbar {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.public-filter-toolbar h2 {
+  margin: 0 0 0.25rem;
+}
+
+.public-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) repeat(5, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.public-schedule-table-wrap {
+  display: block;
+}
+
+.public-schedule-card-list {
+  display: none;
+}
+
+.public-status-stack {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+.public-status-stack small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.public-pagination-bar {
+  margin-top: 1rem;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.pagination-actions span {
+  color: var(--text);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.public-detail-panel {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.public-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.public-detail-head h2 {
+  margin: 0;
+  color: var(--up-blue-950);
+}
+
+.public-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.public-detail-grid article {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--background-soft);
+}
+
+.public-detail-grid span,
+.public-detail-grid small {
+  color: var(--muted);
+}
+
+.public-detail-grid span {
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.public-detail-grid strong {
+  color: var(--up-blue-950);
+}
+
+.public-schedule-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.public-schedule-card h3,
+.public-schedule-card p {
+  margin: 0;
+}
+
+.public-schedule-card > div > span,
+.public-schedule-card dt {
+  color: var(--muted);
+}
+
+.public-schedule-card dl {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.public-schedule-card dl > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.public-schedule-card dt {
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.public-schedule-card dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+@media (max-width: 1180px) {
+  .public-schedule-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .public-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .public-schedule-summary-grid,
+  .public-filter-grid,
+  .public-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .public-detail-head,
+  .pagination-bar,
+  .pagination-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .public-schedule-table-wrap {
+    display: none;
+  }
+
+  .public-schedule-card-list {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .pagination-actions .secondary-button,
+  .public-detail-head .secondary-button {
+    width: 100%;
+  }
+}
+
+
+/* =========================================================
+   Phase 6-H1-A — Reusable list, filter, pagination, action UI
+   ========================================================= */
+
+.smart-table-card {
+  display: grid;
+  overflow: hidden;
+}
+
+.smart-table-toolbar {
+  padding: 1rem 1rem 0;
+}
+
+.smart-table-scroll {
+  border-radius: inherit;
+}
+
+.smart-table {
+  table-layout: auto;
+}
+
+.smart-table th,
+.smart-table td {
+  line-height: 1.45;
+}
+
+.smart-table-compact .smart-table th,
+.smart-table-compact .smart-table td {
+  padding: 0.68rem 0.8rem;
+}
+
+.smart-table tbody tr {
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.smart-table tbody tr:focus-within {
+  background: var(--up-blue-50);
+  box-shadow: inset 3px 0 0 var(--up-blue-700);
+}
+
+.smart-table-mobile-list {
+  display: none;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.smart-table-mobile-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.smart-table-mobile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.smart-table-mobile-head > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.smart-table-mobile-head strong {
+  color: var(--up-blue-950);
+  line-height: 1.35;
+}
+
+.smart-table-mobile-head span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.smart-table-mobile-meta {
+  display: flex;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.smart-table-mobile-grid {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.smart-table-mobile-grid > div {
+  display: grid;
+  gap: 0.22rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.smart-table-mobile-grid dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.smart-table-mobile-grid dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+}
+
+.smart-table-mobile-empty {
+  padding: 1.5rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  text-align: center;
+  background: var(--background-soft);
+}
+
+.smart-table-footer {
+  padding: 0.85rem 1rem 1rem;
+  border-top: 1px solid var(--border-soft);
+  background: var(--background-soft);
+}
+
+.filter-toolbar {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(6, 75, 155, 0.04), rgba(245, 197, 66, 0.08)),
+    var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-toolbar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.filter-toolbar-head h2 {
+  margin: 0 0 0.25rem;
+  color: var(--up-blue-950);
+  font-size: 1.05rem;
+}
+
+.filter-toolbar-head p,
+.filter-toolbar-meta {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.filter-toolbar-action {
+  flex: 0 0 auto;
+}
+
+.filter-toolbar-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.35fr) repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.filter-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.filter-field label {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filter-field input,
+.filter-field select {
+  width: 100%;
+}
+
+.filter-field-search {
+  min-width: min(100%, 260px);
+}
+
+.action-group {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.action-group-wrap {
+  flex-wrap: wrap;
+}
+
+.action-group-start {
+  justify-content: flex-start;
+}
+
+.action-group-center {
+  justify-content: center;
+}
+
+.action-group-end {
+  justify-content: flex-end;
+}
+
+.action-group-between {
+  justify-content: space-between;
+}
+
+.action-group-compact {
+  gap: 0.35rem;
+}
+
+.action-group button,
+.action-group a {
+  white-space: nowrap;
+}
+
+.smart-pagination {
+  width: 100%;
+}
+
+.pagination-summary {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.pagination-summary strong {
+  color: var(--text);
+}
+
+.pagination-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.pagination-size-control select {
+  min-width: 78px;
+  padding-block: 0.45rem;
+}
+
+.detail-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(6, 34, 74, 0.38);
+  backdrop-filter: blur(4px);
+}
+
+.detail-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(100%, 720px);
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: -24px 0 48px rgba(15, 23, 42, 0.22);
+}
+
+.detail-panel-sm {
+  width: min(100%, 520px);
+}
+
+.detail-panel-md {
+  width: min(100%, 720px);
+}
+
+.detail-panel-lg {
+  width: min(100%, 920px);
+}
+
+.detail-panel-head,
+.detail-panel-footer {
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border-soft);
+  background: #ffffff;
+}
+
+.detail-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.detail-panel-head h2 {
+  margin: 0;
+  color: var(--up-blue-950);
+  font-size: 1.15rem;
+}
+
+.detail-panel-head p {
+  margin: 0.28rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.detail-panel-body {
+  overflow: auto;
+  padding: 1.1rem;
+}
+
+.detail-panel-footer {
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 0;
+}
+
+.section-card-flush .section-card-body {
+  padding: 0;
+}
+
+@media (max-width: 860px) {
+  .filter-toolbar-head,
+  .pagination-bar,
+  .pagination-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-toolbar-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-toolbar-action,
+  .filter-toolbar-action .action-group {
+    width: 100%;
+  }
+
+  .filter-toolbar-action button,
+  .filter-toolbar-action a,
+  .action-group button,
+  .action-group a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pagination-actions {
+    width: 100%;
+  }
+
+  .pagination-size-control {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .pagination-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .smart-table-card {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .smart-table-scroll {
+    display: none;
+  }
+
+  .smart-table-mobile-list {
+    display: grid;
+    padding: 0;
+  }
+
+  .smart-table-toolbar,
+  .smart-table-footer {
+    padding-inline: 0;
+  }
+
+  .smart-table-footer {
+    border-top: 0;
+    background: transparent;
+  }
+
+  .smart-table-mobile-head {
+    flex-direction: column;
+  }
+
+  .smart-table-mobile-meta {
+    justify-content: flex-start;
+  }
+
+  .detail-panel-overlay {
+    display: block;
+  }
+
+  .detail-panel {
+    width: 100%;
+  }
+}
+
+
+/* =========================================================
+   Table regression cleanup — scoped DataTable compatibility
+   ========================================================= */
+
+.table-empty-cell {
+  padding: 1.25rem !important;
+  text-align: center !important;
+  color: var(--muted) !important;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.smart-table-mobile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-start;
 }

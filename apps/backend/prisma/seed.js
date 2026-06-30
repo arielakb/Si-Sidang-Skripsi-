@@ -112,6 +112,12 @@ const permissions = [
   ["seminar.review", "seminar", "review", "Review seminar proposal"],
   ["seminar.approve", "seminar", "approve", "Approve seminar proposal"],
 
+  ["sidang.read", "sidang", "read", "Lihat workflow sidang"],
+  ["sidang.manage", "sidang", "manage", "Kelola workflow sidang"],
+  ["sidang.assign_penguji", "sidang", "assign_penguji", "Assign penguji sidang"],
+  ["sidang.input_hasil", "sidang", "input_hasil", "Input hasil sidang"],
+  ["sidang.upload_surat", "sidang", "upload_surat", "Upload surat perjanjian sidang"],
+
   ["bimbingan.create", "bimbingan", "create", "Ajukan bimbingan"],
   ["bimbingan.confirm", "bimbingan", "confirm", "Konfirmasi bimbingan"],
   ["bimbingan.validate", "bimbingan", "validate", "Validasi bimbingan"],
@@ -183,7 +189,6 @@ const rolePermissionMap = {
     "profile.update",
     "public_schedule.read",
     "master_data.read",
-    "skripsi.read",
     "skripsi.create",
     "berkas.upload",
     "berkas.download",
@@ -197,6 +202,8 @@ const rolePermissionMap = {
     "gamification.read",
     "notification.read",
     "bimbingan.validate",
+    "sidang.read",
+    "berkas.download",
   ],
 
   dosen_reguler: [
@@ -228,6 +235,7 @@ const rolePermissionMap = {
     "gamification.manage",
     "notification.read",
     "skripsi.approve_sidang",
+    "sidang.read",
   ],
 
   dosen_penguji: [
@@ -235,7 +243,6 @@ const rolePermissionMap = {
     "profile.read",
     "profile.update",
     "public_schedule.read",
-    "skripsi.read",
     "berkas.review",
     "berkas.download",
     "seminar.review",
@@ -247,6 +254,11 @@ const rolePermissionMap = {
     "revisi.approve",
     "notification.read",
     "berkas.upload",
+    "sidang.read",
+    "sidang.input_hasil",
+    "sidang.upload_surat",
+    "berkas.upload",
+    "berkas.download",
   ],
 
   dosen_koordinator: [
@@ -264,7 +276,13 @@ const rolePermissionMap = {
     "nilai.read",
     "laporan.read",
     "notification.read",
-    "berkas.download"
+    "berkas.download",
+    "sidang.read",
+    "sidang.manage",
+    "sidang.assign_penguji",
+    "sidang.input_hasil",
+    "sidang.upload_surat"
+
   ],
 
   ketua_prodi: [
@@ -290,7 +308,13 @@ const rolePermissionMap = {
     "notification.read",
     "berkas.download",
     "audit.read",
-    "skripsi.update"
+    "skripsi.update",
+    "sidang.read",
+    "sidang.manage",
+    "sidang.assign_penguji",
+    "sidang.input_hasil",
+    "sidang.upload_surat"
+
   ],
 
   staf_prodi: [
@@ -304,7 +328,8 @@ const rolePermissionMap = {
     "ruang.approve",
     "ruang.manage",
     "notification.read",
-    "berkas.download"
+    "berkas.download",
+    "sidang.read",
   ]
 };
 
@@ -353,6 +378,122 @@ const gradingScales = [
   { letter: "C", minScore: 60, maxScore: 69.99 },
   { letter: "D", minScore: 50, maxScore: 59.99 },
   { letter: "E", minScore: 0, maxScore: 49.99 }
+];
+
+const workflowStages = [
+  {
+    code: "SEMINAR_PROPOSAL",
+    name: "Seminar Proposal",
+    urutan: 10,
+    description: "Tahap pengajuan dan pelaksanaan seminar proposal"
+  },
+  {
+    code: "SEMINAR_HASIL",
+    name: "Seminar Hasil",
+    urutan: 20,
+    description: "Tahap seminar hasil setelah bimbingan terpenuhi"
+  },
+  {
+    code: "SIDANG_KOMPRE",
+    name: "Sidang Komprehensif",
+    urutan: 30,
+    description: "Tahap sidang komprehensif setelah seminar hasil lolos"
+  },
+  {
+    code: "BIMBINGAN",
+    name: "Bimbingan Skripsi",
+    urutan: 15,
+    description: "Tahap bimbingan setelah seminar proposal lolos"
+  },
+  {
+    code: "SIDANG_AKHIR",
+    name: "Sidang Akhir",
+    urutan: 40,
+    description: "Tahap pengumuman akhir kelulusan skripsi"
+  },
+
+];
+
+const workflowRules = [
+  {
+    stageCode: "SEMINAR_PROPOSAL",
+    ruleKey: "MAX_ATTEMPT",
+    ruleValue: "3",
+    description: "Maksimal percobaan seminar proposal"
+  },
+  {
+    stageCode: "SEMINAR_PROPOSAL",
+    ruleKey: "MIN_PENGUJI",
+    ruleValue: "2",
+    description: "Minimal dosen penguji seminar proposal"
+  },
+  {
+    stageCode: "SEMINAR_HASIL",
+    ruleKey: "MIN_BIMBINGAN_VALID",
+    ruleValue: "8",
+    description: "Minimal bimbingan valid sebelum seminar hasil"
+  },
+  {
+    stageCode: "SEMINAR_HASIL",
+    ruleKey: "MIN_PENGUJI",
+    ruleValue: "2",
+    description: "Minimal dosen penguji seminar hasil"
+  },
+  {
+    stageCode: "SIDANG_KOMPRE",
+    ruleKey: "MIN_PENGUJI",
+    ruleValue: "2",
+    description: "Minimal dosen penguji sidang komprehensif"
+  },
+  {
+    stageCode: "SIDANG_KOMPRE",
+    ruleKey: "REQUIRED_BERKAS",
+    ruleValue: "",
+    description: "Sidang Kompre tidak membutuhkan upload berkas dari mahasiswa"
+  },
+  {
+    stageCode: "SEMINAR_PROPOSAL",
+    ruleKey: "REQUIRED_BERKAS",
+    ruleValue: "PROPOSAL,PRESENTASI",
+    description: "Berkas wajib untuk seminar proposal"
+  },
+  {
+    stageCode: "BIMBINGAN",
+    ruleKey: "MIN_PEMBIMBING",
+    ruleValue: "2",
+    description: "Minimal dosen pembimbing setelah seminar proposal lolos"
+  },
+  {
+    stageCode: "BIMBINGAN",
+    ruleKey: "MIN_BIMBINGAN_VALID",
+    ruleValue: "8",
+    description: "Minimal bimbingan valid sebelum lanjut seminar hasil"
+  },
+  {
+    stageCode: "SEMINAR_HASIL",
+    ruleKey: "REQUIRED_BERKAS",
+    ruleValue: "SIDANG_SOFTCOPY,SIDANG_PRESENTASI",
+    description: "Berkas wajib untuk seminar hasil"
+  },
+  {
+    stageCode: "SIDANG_KOMPRE",
+    ruleKey: "MAX_ATTEMPT",
+    ruleValue: "3",
+    description: "Maksimal percobaan Sidang Kompre"
+  },
+  {
+    stageCode: "SIDANG_AKHIR",
+    ruleKey: "MIN_PENGUJI",
+    ruleValue: "2",
+    description: "Minimal dosen penguji untuk Sidang Akhir"
+  },
+  {
+    stageCode: "SIDANG_AKHIR",
+    ruleKey: "REQUIRED_BERKAS",
+    ruleValue: "FINAL_SKRIPSI",
+    description: "Berkas final skripsi wajib sebelum assign penguji Sidang Akhir"
+  }
+      
 ];
 
 const badges = [
@@ -479,6 +620,38 @@ async function seedMasterData() {
   }
 }
 
+async function seedWorkflowRules() {
+  for (const stage of workflowStages) {
+    await prisma.workflowStage.upsert({
+      where: {
+        code: stage.code
+      },
+      update: stage,
+      create: stage
+    });
+  }
+
+  for (const rule of workflowRules) {
+    await prisma.workflowRule.upsert({
+      where: {
+        stageCode_ruleKey: {
+          stageCode: rule.stageCode,
+          ruleKey: rule.ruleKey
+        }
+      },
+      update: {
+        ruleValue: rule.ruleValue,
+        description: rule.description,
+        isActive: true
+      },
+      create: {
+        ...rule,
+        isActive: true
+      }
+    });
+  }
+}
+
 async function seedAdmin() {
   const passwordHash = await bcrypt.hash(
     process.env.SEED_ADMIN_PASSWORD,
@@ -538,6 +711,9 @@ async function main() {
 
   console.log("Seeding master data...");
   await seedMasterData();
+
+  console.log("Seeding workflow rules...");
+  await seedWorkflowRules();
 
   console.log("Seeding admin user...");
   await seedAdmin();

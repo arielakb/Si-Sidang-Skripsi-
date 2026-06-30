@@ -28,11 +28,21 @@ enum SkripsiStatus {
   MENUNGGU_REVISI
   MENUNGGU_PENGESAHAN
   MENUNGGU_FINAL
+  MENUNGGU_PEMBIMBING
+  BIMBINGAN
+  MENUNGGU_SEMINAR_HASIL
+  SEMINAR_HASIL
+  MENUNGGU_KOMPRE
+  SIDANG_KOMPRE
   SELESAI
   DITOLAK
   NONAKTIF
   DIBATALKAN
   DIARSIPKAN
+  MENUNGGU_SIDANG_AKHIR
+  SIDANG_AKHIR
+  LULUS_SKRIPSI
+  TIDAK_LULUS_SKRIPSI
 }
 
 enum DosenSkripsiPeran {
@@ -97,6 +107,42 @@ enum RevisiStatus {
   DITOLAK
 }
 
+enum SidangJenis {
+  SEMINAR_PROPOSAL
+  SEMINAR_HASIL
+  SIDANG_KOMPRE
+  SIDANG_AKHIR
+}
+
+enum SidangStatus {
+  DRAFT
+  MENUNGGU_BERKAS
+  MENUNGGU_PENGUJI
+  MENUNGGU_JADWAL
+  DIJADWALKAN
+  BERLANGSUNG
+  MENUNGGU_NILAI
+  MENUNGGU_KEPUTUSAN
+  SELESAI
+  DIBATALKAN
+}
+
+enum SidangHasil {
+  LOLOS
+  TIDAK_LOLOS
+  REVISI
+  ULANG
+  LULUS
+  TIDAK_LULUS
+}
+
+enum SidangDosenPeran {
+  PENGUJI
+  PEMBIMBING
+  KETUA_PENGUJI
+  SEKRETARIS
+}
+
 enum NotifikasiStatus {
   UNREAD
   READ
@@ -136,6 +182,10 @@ model User {
   logAktivitas            LogAktivitas[]
   userBadges              UserBadge[]
   auditLogs               AuditLog[]        @relation("AuditLogUser")
+  sidangCreated           Sidang[]          @relation("SidangCreatedBy")
+  sidangDecided           Sidang[]          @relation("SidangDecidedBy")
+  sidangDosen             SidangDosen[]     @relation("SidangDosenUser")
+  assignedSidangDosen     SidangDosen[]     @relation("SidangDosenAssignedBy")
 
   @@map("users")
 }
@@ -334,6 +384,7 @@ model Skripsi {
   revisi           Revisi[]
   peminjamanRuang  PeminjamanRuang[]
   pengesahan       Pengesahan?
+  sidang           Sidang[]
   gamification     Gamification?
   nilaiAkhir       Float?
   nilaiHuruf       String?
@@ -365,9 +416,95 @@ model SkripsiDosen {
   @@map("skripsi_dosen")
 }
 
+model WorkflowStage {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  urutan      Int      @default(0)
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rules WorkflowRule[]
+
+  @@map("workflow_stages")
+}
+
+model WorkflowRule {
+  id          String   @id @default(cuid())
+  stageCode   String
+  ruleKey     String
+  ruleValue   String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stage WorkflowStage @relation(fields: [stageCode], references: [code], onDelete: Cascade)
+
+  @@unique([stageCode, ruleKey])
+  @@index([stageCode])
+  @@index([ruleKey])
+  @@map("workflow_rules")
+}
+
+model Sidang {
+  id           String        @id @default(cuid())
+  skripsiId    String
+  jenis        SidangJenis
+  attemptNo    Int           @default(1)
+  status       SidangStatus  @default(DRAFT)
+  hasil        SidangHasil?
+  catatanHasil String?
+  createdById  String?
+  decidedById  String?
+  decidedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  skripsi   Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("SidangCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  decidedBy User?   @relation("SidangDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  dosen        SidangDosen[]
+  jadwalSidang JadwalSidang[]
+  nilaiSidang  NilaiSidang[]
+  revisi       Revisi[]
+  berkas       Berkas[]
+
+  @@unique([skripsiId, jenis, attemptNo])
+  @@index([skripsiId])
+  @@index([jenis])
+  @@index([status])
+  @@index([hasil])
+  @@map("sidang")
+}
+
+model SidangDosen {
+  id           String           @id @default(cuid())
+  sidangId     String
+  dosenId      String
+  peran        SidangDosenPeran
+  assignedById String?
+  isActive     Boolean          @default(true)
+  assignedAt   DateTime         @default(now())
+
+  sidang     Sidang @relation(fields: [sidangId], references: [id], onDelete: Cascade)
+  dosen      User   @relation("SidangDosenUser", fields: [dosenId], references: [id])
+  assignedBy User?  @relation("SidangDosenAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([sidangId, dosenId, peran])
+  @@index([sidangId])
+  @@index([dosenId])
+  @@index([peran])
+  @@map("sidang_dosen")
+}
+
 model Berkas {
   id           String         @id @default(cuid())
   skripsiId    String
+  sidangId     String?
   uploadedById String
   reviewedById String?
   kategori     BerkasKategori
@@ -383,6 +520,7 @@ model Berkas {
   updatedAt    DateTime       @updatedAt
 
   skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  sidang     Sidang? @relation(fields: [sidangId], references: [id], onDelete: SetNull)
   uploadedBy User    @relation("UploadedBerkas", fields: [uploadedById], references: [id])
   reviewedBy User?   @relation("ReviewedBerkas", fields: [reviewedById], references: [id])
 
@@ -391,6 +529,7 @@ model Berkas {
   pengesahan      Pengesahan?
 
   @@index([skripsiId])
+  @@index([sidangId])
   @@index([kategori])
   @@index([status])
   @@map("berkas")
@@ -456,6 +595,7 @@ model BimbinganLog {
 model JadwalSidang {
   id           String             @id @default(cuid())
   skripsiId    String
+  sidangId     String?
   ruangId      String?
   dibuatOlehId String
   tanggal      DateTime
@@ -468,9 +608,11 @@ model JadwalSidang {
   updatedAt    DateTime           @updatedAt
 
   skripsi    Skripsi      @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  sidang     Sidang?      @relation(fields: [sidangId], references: [id], onDelete: SetNull)
   ruang      MasterRuang? @relation(fields: [ruangId], references: [id])
   dibuatOleh User         @relation("JadwalDibuatOleh", fields: [dibuatOlehId], references: [id])
 
+  @@index([sidangId])
   @@index([tanggal])
   @@index([ruangId])
   @@index([status])
@@ -480,6 +622,7 @@ model JadwalSidang {
 model NilaiSidang {
   id        String   @id @default(cuid())
   skripsiId String
+  sidangId  String?
   dosenId   String
   komponen  String   @default("sidang")
   nilai     Decimal  @default(0) @db.Decimal(5, 2)
@@ -488,10 +631,13 @@ model NilaiSidang {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  sidang  Sidang? @relation(fields: [sidangId], references: [id], onDelete: SetNull)
   skripsi Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
   dosen   User    @relation(fields: [dosenId], references: [id])
 
-  @@unique([skripsiId, dosenId, komponen])
+  @@index([skripsiId, dosenId, komponen])
+  @@index([sidangId])
+  @@index([sidangId, dosenId, komponen])
   @@index([skripsiId])
   @@map("nilai_sidang")
 }
@@ -499,6 +645,7 @@ model NilaiSidang {
 model Revisi {
   id           String       @id @default(cuid())
   skripsiId    String
+  sidangId     String?
   dibuatOlehId String
   berkasId     String?      @unique
   catatan      String
@@ -510,11 +657,13 @@ model Revisi {
   updatedAt    DateTime     @updatedAt
 
   skripsi    Skripsi @relation(fields: [skripsiId], references: [id], onDelete: Cascade)
+  sidang     Sidang?  @relation(fields: [sidangId], references: [id], onDelete: SetNull)
   dibuatOleh User    @relation("RevisiDibuatOleh", fields: [dibuatOlehId], references: [id])
   berkas     Berkas? @relation(fields: [berkasId], references: [id])
   approvedBy User?   @relation("RevisiApprovedBy", fields: [approvedById], references: [id])
 
   @@index([skripsiId])
+  @@index([sidangId])
   @@index([status])
   @@map("revisi")
 }

@@ -45,8 +45,14 @@ export const env = {
   },
   security: {
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS || 12),
-    rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW_MINUTES || 15),
-    rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX_REQUESTS || 100)
+    rateLimitWindowMinutes: Number(
+      process.env.RATE_LIMIT_WINDOW_MINUTES ||
+        (process.env.NODE_ENV === "production" ? 15 : 1)
+    ),
+    rateLimitMaxRequests: Number(
+      process.env.RATE_LIMIT_MAX_REQUESTS ||
+        (process.env.NODE_ENV === "production" ? 100 : 10000)
+    )
   },
   cookie: {
   secure: process.env.COOKIE_SECURE === "true",

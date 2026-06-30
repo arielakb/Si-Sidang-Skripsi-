@@ -29,16 +29,21 @@ import { notFoundHandler } from "./middlewares/not-found.js";
 import { errorHandler } from "./middlewares/error-handler.js";
 import laporanRoutes from "./modules/laporan/laporan.routes.js";
 import healthRoutes from "./modules/health/health.routes.js";
+import sidangRoutes from "./modules/sidang/sidang.routes.js";
+import workflowRoutes from "./modules/workflow/workflow.routes.js";
 
 enableBigIntJsonSerialization();
 
 export const app = express();
+
 app.use(helmet());
 
-app.use(cors({
-  origin: env.server.corsOrigin,
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: env.server.corsOrigin,
+    credentials: true
+  })
+);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -48,10 +53,17 @@ app.use(auditLogMiddleware);
 
 app.use(morgan(env.app.environment === "production" ? "combined" : "dev"));
 
-app.use(rateLimit({
-  windowMs: env.security.rateLimitWindowMinutes * 60 * 1000,
-  max: env.security.rateLimitMaxRequests
-}));
+app.use(
+  rateLimit({
+    windowMs: env.security.rateLimitWindowMinutes * 60 * 1000,
+    max:
+      env.app.environment === "production"
+        ? env.security.rateLimitMaxRequests
+        : 10000,
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+);
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
@@ -61,6 +73,8 @@ app.use("/api/master-data", masterDataRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/seminar-proposal", seminarProposalRoutes);
 app.use("/api/skripsi", skripsiRoutes);
+app.use("/api/sidang", sidangRoutes);
+app.use("/api/workflow", workflowRoutes);
 app.use("/api/bimbingan", bimbinganRoutes);
 app.use("/api/jadwal-sidang", jadwalSidangRoutes);
 app.use("/api/peminjaman-ruang", peminjamanRuangRoutes);
@@ -73,16 +87,17 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
 app.use("/api/berkas", berkasRoutes);
 app.use("/api/laporan", laporanRoutes);
-app.use(notFoundHandler);
-app.use(errorHandler);
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health-check", (req, res) => {
   res.json({
     success: true,
     message: "Sisidang backend is running",
     environment: env.app.environment
   });
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.use((err, req, res, next) => {
   console.error(err);

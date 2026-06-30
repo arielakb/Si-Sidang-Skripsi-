@@ -6,6 +6,7 @@ type SectionCardProps = {
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  padded?: boolean;
 };
 
 export default function SectionCard({
@@ -13,11 +14,20 @@ export default function SectionCard({
   description,
   action,
   children,
-  className = ""
+  className = "",
+  padded = true
 }: SectionCardProps) {
   return (
-    <section className={`section-card ${className}`}>
-      {(title || description || action) ? (
+    <section
+      className={[
+        "section-card",
+        padded ? "" : "section-card-flush",
+        className
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {title || description || action ? (
         <div className="section-card-head">
           <div>
             {title ? <h2>{title}</h2> : null}

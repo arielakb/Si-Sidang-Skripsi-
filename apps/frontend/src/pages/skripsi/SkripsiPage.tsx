@@ -92,6 +92,8 @@ function getCompletenessStatus(skripsi: SkripsiItem) {
 
 const inactiveSkripsiStatuses = [
   "SELESAI",
+  "LULUS_SKRIPSI",
+  "TIDAK_LULUS_SKRIPSI",
   "DITOLAK",
   "NONAKTIF",
   "DIBATALKAN",
@@ -106,6 +108,15 @@ function isSkripsiActive(item: SkripsiItem) {
 
 function getSkripsiActiveStatus(item: SkripsiItem) {
   return isSkripsiActive(item) ? "AKTIF" : "NONAKTIF";
+}
+
+function getKelulusanLabel(status?: string | null) {
+  const normalized = String(status || "").toUpperCase();
+
+  if (normalized === "LULUS_SKRIPSI") return "LULUS SKRIPSI";
+  if (normalized === "TIDAK_LULUS_SKRIPSI") return "TIDAK LULUS SKRIPSI";
+
+  return "-";
 }
 
 export default function SkripsiPage() {
@@ -755,6 +766,11 @@ export default function SkripsiPage() {
                       value={getSkripsiActiveStatus(latestSelectedSkripsi)}
                       size="sm"
                     />
+                  </div>
+
+                  <div className="info-row">
+                    <span>Status Kelulusan</span>
+                    <strong>{getKelulusanLabel(latestSelectedSkripsi.status)}</strong>
                   </div>
 
                   <div className="info-row">

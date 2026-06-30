@@ -1,34 +1,38 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
 import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
+import SectionCard from "../../components/ui/SectionCard";
 import StatusBadge from "../../components/ui/StatusBadge";
-import { api } from "../../services/api";
+import {
+  getPublicRooms,
+  getPublicScheduleDetail,
+  getPublicSchedules,
+  type PublicJadwalSidang,
+  type PublicListResponse,
+  type PublicRuang
+} from "../../services/publicSchedule";
 
-type PublicJadwalSidang = {
-  id: string;
-  status?: string | null;
-  waktuMulai?: string | null;
-  waktuSelesai?: string | null;
-  tempatManual?: string | null;
-  linkVicon?: string | null;
-  ruang?: {
-    code?: string | null;
-    name?: string | null;
-    nama?: string | null;
-  } | null;
-  skripsi?: {
-    title?: string | null;
-    mahasiswa?: {
-      name?: string | null;
-      identifier?: string | null;
-    } | null;
-    peminatan?: {
-      name?: string | null;
-    } | null;
-  } | null;
-};
+const jenisSidangOptions = [
+  {
+    value: "SEMINAR_PROPOSAL",
+    label: "Seminar Proposal"
+  },
+  {
+    value: "SEMINAR_HASIL",
+    label: "Seminar Hasil"
+  },
+  {
+    value: "SIDANG_KOMPRE",
+    label: "Sidang Kompre"
+  },
+  {
+    value: "SIDANG_AKHIR",
+    label: "Sidang Akhir"
+  }
+];
 
 const statusOptions = ["DIJADWALKAN", "BERLANGSUNG", "SELESAI"];
 
@@ -41,10 +45,18 @@ function formatDateTime(value?: string | null) {
   }).format(new Date(value));
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return "-";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "full"
+  }).format(new Date(value));
+}
+
 function getRoomLabel(item: PublicJadwalSidang) {
   return (
+    item.ruangLabel ||
     item.ruang?.name ||
-    item.ruang?.nama ||
     item.ruang?.code ||
     item.tempatManual ||
     item.linkVicon ||
@@ -52,46 +64,114 @@ function getRoomLabel(item: PublicJadwalSidang) {
   );
 }
 
+function getJenisSidangLabel(item: PublicJadwalSidang) {
+  return (
+    item.jenisSidangLabel ||
+    jenisSidangOptions.find((option) => option.value === item.jenisSidang)
+      ?.label ||
+    item.jenisSidang ||
+    "Jadwal Sidang"
+  );
+}
+
+function getDetailHref(id: string) {
+  return `/?jadwal=${id}#jadwal-sidang`;
+}
+
+function getPublicSummary(rows: PublicJadwalSidang[]) {
+  return {
+    total: rows.length,
+    sempro: rows.filter((item) => item.jenisSidang === "SEMINAR_PROPOSAL")
+      .length,
+    semhas: rows.filter((item) => item.jenisSidang === "SEMINAR_HASIL").length,
+    kompre: rows.filter((item) => item.jenisSidang === "SIDANG_KOMPRE").length,
+    akhir: rows.filter((item) => item.jenisSidang === "SIDANG_AKHIR").length,
+    berlangsung: rows.filter((item) => item.status === "BERLANGSUNG").length
+  };
+}
+
 export default function PublicDashboard() {
   const [search, setSearch] = useState("");
+  const [jenisSidang, setJenisSidang] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [tanggalFilter, setTanggalFilter] = useState("");
+  const [ruangId, setRuangId] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [selectedJadwalId, setSelectedJadwalId] = useState<string | null>(null);
 
-  const jadwalQuery = useQuery({
-    queryKey: ["public-jadwal-sidang"],
-    queryFn: async () => {
-      const response = await api.get<{
-        data: PublicJadwalSidang[];
-      }>("/public/jadwal-sidang", {
-        params: {
-          limit: 50
-        }
-      });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const jadwalId = params.get("jadwal");
 
-      return response.data.data ?? [];
+    if (jadwalId) {
+      setSelectedJadwalId(jadwalId);
     }
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, jenisSidang, statusFilter, tanggalFilter, ruangId, limit]);
+
+  const jadwalQuery = useQuery<PublicListResponse<PublicJadwalSidang>>({
+    queryKey: [
+      "public-jadwal-sidang",
+      {
+        search,
+        jenisSidang,
+        statusFilter,
+        tanggalFilter,
+        ruangId,
+        page,
+        limit
+      }
+    ],
+    queryFn: () =>
+      getPublicSchedules({
+        search,
+        jenisSidang,
+        status: statusFilter,
+        tanggal: tanggalFilter,
+        ruangId,
+        page,
+        limit,
+        sortBy: "tanggal",
+        sortOrder: "asc"
+      }),
+    placeholderData: keepPreviousData
   });
 
-  const jadwalRows = jadwalQuery.data ?? [];
+  const ruangQuery = useQuery<PublicRuang[]>({
+    queryKey: ["public-ruang"],
+    queryFn: getPublicRooms
+  });
 
-  const filteredJadwalRows = useMemo(() => {
-    const keyword = search.toLowerCase();
+  const selectedJadwalQuery = useQuery<PublicJadwalSidang>({
+    queryKey: ["public-jadwal-sidang-detail", selectedJadwalId],
+    queryFn: () => getPublicScheduleDetail(String(selectedJadwalId)),
+    enabled: Boolean(selectedJadwalId)
+  });
 
-    return jadwalRows.filter((item) => {
-      const matchesSearch = `${item.skripsi?.title ?? ""} ${
-        item.skripsi?.mahasiswa?.name ?? ""
-      } ${item.skripsi?.mahasiswa?.identifier ?? ""} ${
-        item.skripsi?.peminatan?.name ?? ""
-      } ${getRoomLabel(item)} ${item.status ?? ""}`
-        .toLowerCase()
-        .includes(keyword);
+  const jadwalRows: PublicJadwalSidang[] = jadwalQuery.data?.data ?? [];
+  const meta = jadwalQuery.data?.meta ?? {
+    page,
+    limit,
+    total: 0,
+    totalPages: 1
+  };
 
-      const matchesStatus = statusFilter
-        ? item.status === statusFilter
-        : true;
+  const summary = useMemo(() => getPublicSummary(jadwalRows), [jadwalRows]);
+  const selectedJadwal = selectedJadwalQuery.data ?? null;
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [jadwalRows, search, statusFilter]);
+  const closeDetail = () => {
+    setSelectedJadwalId(null);
+    window.history.replaceState({}, "", "/#jadwal-sidang");
+  };
+
+  const openDetail = (item: PublicJadwalSidang) => {
+    setSelectedJadwalId(item.id);
+    window.history.replaceState({}, "", getDetailHref(item.id));
+  };
 
   return (
     <main className="public-up-page">
@@ -141,7 +221,7 @@ export default function PublicDashboard() {
 
         <div className="public-up-hero-card">
           <span>Jadwal Sidang Terpublikasi</span>
-          <strong>{jadwalRows.length}</strong>
+          <strong>{meta.total}</strong>
           <p>
             Menampilkan sidang dengan status dijadwalkan, berlangsung, atau
             selesai.
@@ -152,22 +232,22 @@ export default function PublicDashboard() {
       <section className="public-feature-grid">
         <article>
           <strong>Seminar Proposal</strong>
-          <span>Upload proposal, presentasi, dan persetujuan kode etik.</span>
+          <span>Upload proposal, presentasi, jadwal, dan hasil seminar.</span>
         </article>
 
         <article>
-          <strong>Bimbingan Skripsi</strong>
-          <span>Dosen pembimbing memvalidasi progress minimal 8x bimbingan.</span>
+          <strong>Seminar Hasil</strong>
+          <span>Sidang hasil, input nilai, revisi, dan validasi akademik.</span>
         </article>
 
         <article>
-          <strong>Jadwal Sidang</strong>
-          <span>Informasi sidang, ruang, waktu, dan status pelaksanaan.</span>
+          <strong>Sidang Kompre</strong>
+          <span>Jadwal dan hasil sidang komprehensif skripsi mahasiswa.</span>
         </article>
 
         <article>
-          <strong>Finalisasi</strong>
-          <span>Revisi, nilai sidang, berkas final, dan pengesahan akhir.</span>
+          <strong>Sidang Akhir</strong>
+          <span>Pengumuman hasil akhir lulus atau tidak lulus skripsi.</span>
         </article>
       </section>
 
@@ -191,60 +271,137 @@ export default function PublicDashboard() {
           </button>
         </div>
 
-        <section className="list-card public-schedule-table-card">
-          <div className="table-toolbar master-table-toolbar">
-            <div>
-              <h2>Daftar Jadwal Sidang</h2>
-              <p className="muted">
-                Table jadwal sidang berdasarkan waktu, mahasiswa, ruang, dan
-                status.
-              </p>
-            </div>
+        <div className="public-schedule-summary-grid">
+          <article>
+            <span>Total Jadwal</span>
+            <strong>{meta.total}</strong>
+          </article>
+          <article>
+            <span>Sempro</span>
+            <strong>{summary.sempro}</strong>
+          </article>
+          <article>
+            <span>Semhas</span>
+            <strong>{summary.semhas}</strong>
+          </article>
+          <article>
+            <span>Kompre</span>
+            <strong>{summary.kompre}</strong>
+          </article>
+          <article>
+            <span>Sidang Akhir</span>
+            <strong>{summary.akhir}</strong>
+          </article>
+          <article>
+            <span>Berlangsung</span>
+            <strong>{summary.berlangsung}</strong>
+          </article>
+        </div>
 
-            <div className="master-toolbar-actions">
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Cari judul, mahasiswa, NPM, ruang..."
-              />
-
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-              >
-                <option value="">Semua Status</option>
-                {statusOptions.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {jadwalQuery.isLoading ? (
+        <SectionCard
+          title="Daftar Jadwal Sidang"
+          description="Filter berdasarkan jenis sidang, tanggal, ruang, status, mahasiswa, atau judul skripsi."
+          className="public-schedule-table-card"
+        >
+          {jadwalQuery.isLoading && jadwalRows.length === 0 ? (
             <EmptyState
               title="Memuat jadwal sidang..."
               description="Mohon tunggu sebentar."
             />
           ) : (
-            <DataTable
-              data={filteredJadwalRows}
+            <DataTable<PublicJadwalSidang>
+              data={jadwalRows}
               emptyMessage="Belum ada jadwal sidang publik"
+              isLoading={jadwalQuery.isLoading && jadwalRows.length === 0}
+              loadingMessage="Memuat jadwal sidang..."
+              getRowKey={(item) => item.id}
+              toolbar={
+                <FilterToolbar
+                  searchValue={search}
+                  onSearchChange={setSearch}
+                  searchPlaceholder="Cari judul, mahasiswa, NPM, ruang..."
+                  meta={
+                    <span>
+                      Menampilkan <strong>{jadwalRows.length}</strong> dari{" "}
+                      <strong>{meta.total}</strong> jadwal publik.
+                    </span>
+                  }
+                >
+                  <div className="filter-field">
+                    <label>Jenis Sidang</label>
+                    <select
+                      value={jenisSidang}
+                      onChange={(event) => setJenisSidang(event.target.value)}
+                    >
+                      <option value="">Semua Jenis</option>
+                      {jenisSidangOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="filter-field">
+                    <label>Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={(event) => setStatusFilter(event.target.value)}
+                    >
+                      <option value="">Semua Status</option>
+                      {statusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="filter-field">
+                    <label>Tanggal</label>
+                    <input
+                      type="date"
+                      value={tanggalFilter}
+                      onChange={(event) => setTanggalFilter(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="filter-field">
+                    <label>Ruang</label>
+                    <select
+                      value={ruangId}
+                      onChange={(event) => setRuangId(event.target.value)}
+                    >
+                      <option value="">Semua Ruang</option>
+                      {(ruangQuery.data ?? []).map((ruang) => (
+                        <option key={ruang.id} value={ruang.id}>
+                          {ruang.name || ruang.code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </FilterToolbar>
+              }
               columns={[
-                {
-                  key: "no",
-                  header: "No",
-                  align: "center",
-                  render: (_item, index) => index + 1
-                },
                 {
                   key: "waktu",
                   header: "Waktu",
+                  mobilePriority: "subtitle",
                   render: (item) => (
                     <div className="table-title-cell">
                       <strong>{formatDateTime(item.waktuMulai)}</strong>
                       <span>Selesai: {formatDateTime(item.waktuSelesai)}</span>
+                    </div>
+                  )
+                },
+                {
+                  key: "jenis",
+                  header: "Jenis Sidang",
+                  mobilePriority: "title",
+                  render: (item) => (
+                    <div className="table-title-cell">
+                      <strong>{getJenisSidangLabel(item)}</strong>
+                      <span>Attempt {item.sidang?.attemptNo || 1}</span>
                     </div>
                   )
                 },
@@ -277,12 +434,135 @@ export default function PublicDashboard() {
                   key: "status",
                   header: "Status",
                   align: "center",
-                  render: (item) => <StatusBadge value={item.status} size="sm" />
+                  mobilePriority: "meta",
+                  render: (item) => (
+                    <div className="public-status-stack">
+                      <StatusBadge value={item.status} size="sm" />
+                      {item.sidangStatus ? <small>{item.sidangStatus}</small> : null}
+                    </div>
+                  )
+                },
+                {
+                  key: "detail",
+                  header: "Detail",
+                  align: "center",
+                  render: (item) => (
+                    <a
+                      href={getDetailHref(item.id)}
+                      className="small-button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        openDetail(item);
+                      }}
+                    >
+                      Detail
+                    </a>
+                  )
                 }
               ]}
+              pagination={{
+                page: meta.page,
+                pageSize: meta.limit,
+                total: meta.total,
+                onPageChange: setPage,
+                onPageSizeChange: (pageSize) => {
+                  setLimit(pageSize);
+                  setPage(1);
+                },
+                itemLabel: "jadwal"
+              }}
+              mobileTitle={(item) => getJenisSidangLabel(item)}
+              mobileSubtitle={(item) =>
+                `${item.skripsi?.mahasiswa?.name || "-"} • ${
+                  item.skripsi?.title || "Tanpa judul"
+                }`
+              }
+              mobileMeta={(item) => <StatusBadge value={item.status} size="sm" />}
             />
           )}
-        </section>
+        </SectionCard>
+
+        {selectedJadwalId ? (
+          <section className="public-detail-panel">
+            <div className="public-detail-head">
+              <div>
+                <p className="eyebrow">Detail Jadwal Publik</p>
+                <h2>
+                  {selectedJadwal
+                    ? getJenisSidangLabel(selectedJadwal)
+                    : "Memuat detail..."}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeDetail}
+              >
+                Tutup
+              </button>
+            </div>
+
+            {selectedJadwalQuery.isLoading ? (
+              <EmptyState
+                title="Memuat detail jadwal..."
+                description="Mohon tunggu sebentar."
+              />
+            ) : selectedJadwal ? (
+              <div className="public-detail-grid">
+                <article>
+                  <span>Mahasiswa</span>
+                  <strong>{selectedJadwal.skripsi?.mahasiswa?.name || "-"}</strong>
+                  <small>
+                    {selectedJadwal.skripsi?.mahasiswa?.identifier || "-"}
+                  </small>
+                </article>
+
+                <article>
+                  <span>Judul Skripsi</span>
+                  <strong>{selectedJadwal.skripsi?.title || "Tanpa judul"}</strong>
+                  <small>{selectedJadwal.skripsi?.peminatan?.name || "-"}</small>
+                </article>
+
+                <article>
+                  <span>Jenis Sidang</span>
+                  <strong>{getJenisSidangLabel(selectedJadwal)}</strong>
+                  <small>Status sidang: {selectedJadwal.sidangStatus || "-"}</small>
+                </article>
+
+                <article>
+                  <span>Jadwal</span>
+                  <strong>{formatDateOnly(selectedJadwal.tanggal)}</strong>
+                  <small>
+                    {formatDateTime(selectedJadwal.waktuMulai)} -{" "}
+                    {formatDateTime(selectedJadwal.waktuSelesai)}
+                  </small>
+                </article>
+
+                <article>
+                  <span>Ruang / Lokasi</span>
+                  <strong>{getRoomLabel(selectedJadwal)}</strong>
+                  <small>
+                    {selectedJadwal.linkVicon ? "Online / hybrid" : "Tatap muka"}
+                  </small>
+                </article>
+
+                <article>
+                  <span>Status Jadwal</span>
+                  <strong>
+                    <StatusBadge value={selectedJadwal.status} size="sm" />
+                  </strong>
+                  <small>Informasi publik tanpa nilai/catatan internal.</small>
+                </article>
+              </div>
+            ) : (
+              <EmptyState
+                title="Detail jadwal tidak ditemukan"
+                description="Jadwal mungkin sudah diubah atau tidak tersedia."
+              />
+            )}
+          </section>
+        ) : null}
       </section>
     </main>
   );

@@ -241,33 +241,47 @@ export async function registerSeminarProposal(req, res, next) {
       });
     }
 
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: req.user.id,
-        peminatanId,
-        jenisSkripsiId: jenisSkripsi.id,
-        title,
-        abstract,
-        tahap: "SEMINAR_PROPOSAL",
-        status: "MENUNGGU_BERKAS",
-        gamification: {
-          create: {
-            progressPercent: 10,
-            points: 10
-          }
-        }
-      },
-      include: {
-        mahasiswa: {
-          select: {
-            id: true,
-            identifier: true,
-            name: true
+    const skripsi = await prisma.$transaction(async (tx) => {
+      const createdSkripsi = await tx.skripsi.create({
+        data: {
+          mahasiswaId: req.user.id,
+          peminatanId,
+          jenisSkripsiId: jenisSkripsi.id,
+          title,
+          abstract,
+          tahap: "SEMINAR_PROPOSAL",
+          status: "MENUNGGU_BERKAS",
+          gamification: {
+            create: {
+              progressPercent: 10,
+              points: 10
+            }
           }
         },
-        peminatan: true,
-        jenisSkripsi: true
-      }
+        include: {
+          mahasiswa: {
+            select: {
+              id: true,
+              identifier: true,
+              name: true
+            }
+          },
+          peminatan: true,
+          jenisSkripsi: true
+        }
+      });
+
+      await tx.sidang.create({
+        data: {
+          skripsiId: createdSkripsi.id,
+          jenis: "SEMINAR_PROPOSAL",
+          attemptNo: 1,
+          status: "MENUNGGU_BERKAS",
+          createdById: req.user.id
+        }
+      });
+
+      return createdSkripsi;
     });
 
     return res.status(201).json({

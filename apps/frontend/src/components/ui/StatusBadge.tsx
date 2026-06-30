@@ -22,7 +22,10 @@ const successStatuses = [
   "DIJADWALKAN",
   "BERLANGSUNG",
   "SUDAH_DISETUJUI",
-  "SETUJU"
+  "SETUJU",
+  "LOLOS",
+  "LULUS",
+  "LULUS_SKRIPSI"
 ];
 
 const warningStatuses = [
@@ -32,6 +35,13 @@ const warningStatuses = [
   "MENUNGGU_REVISI",
   "MENUNGGU_FINAL",
   "MENUNGGU_PENGESAHAN",
+  "MENUNGGU_PENGUJI",
+  "MENUNGGU_NILAI",
+  "MENUNGGU_KEPUTUSAN",
+  "MENUNGGU_PEMBIMBING",
+  "MENUNGGU_SEMINAR_HASIL",
+  "MENUNGGU_KOMPRE",
+  "MENUNGGU_SIDANG_AKHIR",
   "DIAJUKAN",
   "DISETUJUI_DOSEN",
   "EVALUASI_SIDANG",
@@ -47,7 +57,9 @@ const warningStatuses = [
   "POST",
   "PATCH",
   "PUT",
-  "BELUM_DISETUJUI"
+  "BELUM_DISETUJUI",
+  "REVISI",
+  "ULANG"
 ];
 
 const dangerStatuses = [
@@ -57,55 +69,55 @@ const dangerStatuses = [
   "TOLAK",
   "REJECTED",
   "DIBATALKAN",
-  "DIARSIPKAN",
   "DELETE",
   "CLIENT_ERROR",
   "SERVER_ERROR",
   "LEWAT_DEADLINE",
   "ERROR",
   "FAILED",
-  "GAGAL"
+  "GAGAL",
+  "DIARSIPKAN",
+  "TIDAK_LOLOS",
+  "TIDAK_LULUS",
+  "TIDAK_LULUS_SKRIPSI"
 ];
 
 const infoStatuses = [
-  "KOMPRE",
   "SEMINAR_PROPOSAL",
+  "KOMPRE",
   "SIDANG_SKRIPSI",
   "FINAL",
-  "FINALISASI",
-  "PRESENTASI",
-  "PROPOSAL",
-  "GET",
-  "READ"
+  "BIMBINGAN",
+  "SEMINAR_HASIL",
+  "SIDANG_KOMPRE",
+  "SIDANG_AKHIR"
 ];
 
-function normalizeStatus(value?: string | null) {
-  return String(value || "-").trim().toUpperCase();
+function formatStatus(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getStatusClass(value?: string | null) {
-  const normalized = normalizeStatus(value);
+function getTone(value: string) {
+  const normalized = value.toUpperCase();
 
-  if (successStatuses.includes(normalized)) return "status-success";
-  if (warningStatuses.includes(normalized)) return "status-warning";
-  if (dangerStatuses.includes(normalized)) return "status-danger";
-  if (infoStatuses.includes(normalized)) return "status-info";
+  if (successStatuses.includes(normalized)) return "success";
+  if (warningStatuses.includes(normalized)) return "warning";
+  if (dangerStatuses.includes(normalized)) return "danger";
+  if (infoStatuses.includes(normalized)) return "info";
 
-  return "status-neutral";
-}
-
-function formatStatus(value?: string | null) {
-  const normalized = normalizeStatus(value);
-
-  if (normalized === "-") return "-";
-
-  return normalized.replaceAll("_", " ");
+  return "neutral";
 }
 
 export default function StatusBadge({ value, size = "md" }: StatusBadgeProps) {
+  const normalizedValue = value || "-";
+  const tone = getTone(normalizedValue);
+
   return (
-    <span className={`status-badge ${getStatusClass(value)} status-badge-${size}`}>
-      {formatStatus(value)}
+    <span className={`status-badge status-${tone} status-${size}`}>
+      {formatStatus(normalizedValue)}
     </span>
   );
 }

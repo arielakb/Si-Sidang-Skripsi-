@@ -14,6 +14,16 @@ type MenuItem = {
   permissions?: string[];
 };
 
+const WORKFLOW_ROLES = [
+  "admin",
+  "mahasiswa",
+  "dosen_penguji",
+  "dosen_pembimbing",
+  "dosen_koordinator",
+  "ketua_prodi",
+  "staf_prodi"
+];
+
 const menuItems: MenuItem[] = [
   {
     key: "dashboard",
@@ -22,103 +32,97 @@ const menuItems: MenuItem[] = [
     icon: "⌂"
   },
   {
+    key: "workflow-dashboard",
+    label: "Dashboard Workflow",
+    to: "/app/workflow-dashboard",
+    icon: "▦",
+    roles: WORKFLOW_ROLES,
+    permissions: ["sidang.read"]
+  },
+  {
     key: "skripsi",
     label: "Data Skripsi",
     to: "/app/skripsi",
     icon: "□",
-    permissions: ["skripsi.read"]
+    roles: ["admin", "mahasiswa", "dosen_koordinator", "ketua_prodi"]
   },
   {
-    key: "seminar-review",
-    label: "Review Seminar",
-    to: "/app/seminar-review",
-    icon: "✓",
-    roles: ["admin", "dosen_penguji", "dosen_koordinator", "ketua_prodi"],
-    permissions: ["skripsi.read"]
+    key: "workflow-sidang",
+    label: "Workflow Sidang",
+    to: "/app/workflow-sidang",
+    icon: "⇄",
+    roles: WORKFLOW_ROLES,
+    permissions: ["sidang.read"]
   },
   {
-    key: "assign-pembimbing",
-    label: "Assign Pembimbing",
-    to: "/app/assign-pembimbing",
-    icon: "+",
-    roles: ["admin", "dosen_koordinator", "ketua_prodi", "staf_prodi"],
-    permissions: ["skripsi.assign_dosen"]
+    key: "progress",
+    label: "Progress Akademik",
+    to: "/app/progress",
+    icon: "↗",
+    roles: WORKFLOW_ROLES,
+    permissions: ["sidang.read"]
+  },
+  {
+    key: "riwayat-workflow",
+    label: "Riwayat Sidang",
+    to: "/app/sidang/riwayat-workflow",
+    icon: "▣",
+    roles: WORKFLOW_ROLES,
+    permissions: ["sidang.read"]
   },
   {
     key: "bimbingan",
     label: "Bimbingan",
     to: "/app/bimbingan",
     icon: "◌",
+    roles: ["admin", "mahasiswa", "dosen_pembimbing"],
     permissions: ["bimbingan.read"]
   },
   {
-    key: "progress",
-    label: "Progress Saya",
-    to: "/app/progress",
-    icon: "↗",
-    roles: ["mahasiswa"],
-    permissions: ["gamification.read"]
-  },
-  {
-    key: "jadwal-sidang",
-    label: "Jadwal Sidang",
-    to: "/app/jadwal-sidang",
-    icon: "◷",
-    permissions: ["jadwal_sidang.read"]
-  },
-  {
-    key: "nilai-sidang",
-    label: "Nilai Sidang",
-    to: "/app/nilai-sidang",
-    icon: "★",
-    permissions: ["nilai.read"]
-  },
-  {
-    key: "revisi-final",
-    label: "Revisi & Final",
-    to: "/app/revisi-final",
-    icon: "✎",
-    permissions: [
-      "revisi.create",
-      "revisi.upload",
-      "revisi.approve",
-      "skripsi.approve_final"
-    ]
+    key: "assign-pembimbing",
+    label: "Assign Pembimbing",
+    to: "/app/assign-pembimbing",
+    icon: "+",
+    roles: ["admin", "dosen_koordinator", "ketua_prodi"],
+    permissions: ["skripsi.assign_dosen"]
   },
   {
     key: "peminjaman-ruang",
     label: "Peminjaman Ruang",
     to: "/app/peminjaman-ruang",
     icon: "▣",
-    permissions: ["ruang.borrow", "ruang.approve"]
-  },
-  {
-    key: "users",
-    label: "User Management",
-    to: "/app/users",
-    icon: "◉",
-    permissions: ["user.read"]
+    roles: ["admin", "mahasiswa", "staf_prodi"]
   },
   {
     key: "master-data",
     label: "Master Data",
     to: "/app/master-data",
     icon: "≡",
-    roles: ["admin", "dosen_koordinator", "ketua_prodi"],
-    permissions: ["master_data.read", "master_data.manage"]
+    roles: ["admin", "dosen_koordinator", "ketua_prodi", "staf_prodi"],
+    permissions: ["master_data.read"]
   },
   {
     key: "laporan",
     label: "Laporan",
     to: "/app/laporan",
     icon: "▤",
+    roles: ["admin", "dosen_koordinator", "ketua_prodi"],
     permissions: ["laporan.read"]
+  },
+  {
+    key: "users",
+    label: "User Management",
+    to: "/app/users",
+    icon: "◉",
+    roles: ["admin", "ketua_prodi"],
+    permissions: ["user.read"]
   },
   {
     key: "audit-logs",
     label: "Audit Log",
     to: "/app/audit-logs",
     icon: "◇",
+    roles: ["admin", "ketua_prodi"],
     permissions: ["audit.read"]
   },
   {
@@ -126,18 +130,27 @@ const menuItems: MenuItem[] = [
     label: "Notifikasi",
     to: "/app/notifications",
     icon: "●",
+    roles: [
+      "admin",
+      "mahasiswa",
+      "dosen_penguji",
+      "dosen_pembimbing",
+      "dosen_koordinator",
+      "ketua_prodi",
+      "staf_prodi",
+      "dosen_reguler"
+    ],
     permissions: ["notification.read"]
-  },
-  {
-    key: "leaderboard",
-    label: "Leaderboard",
-    to: "/app/leaderboard",
-    icon: "◆",
-    permissions: ["gamification.read"]
   }
 ];
 
-const menuGroupOrder = ["Utama", "Akademik", "Administrasi", "Monitoring"];
+const menuGroupOrder = [
+  "Dashboard",
+  "Akademik",
+  "Bimbingan",
+  "Administrasi",
+  "Monitoring"
+];
 
 function getRoleContextLabel(roles: string[]) {
   if (roles.includes("admin")) return "Administrator";
@@ -157,42 +170,49 @@ function getMenuLabel(item: MenuItem, roles: string[]) {
     return "Skripsi Saya";
   }
 
+  if (item.key === "progress" && roles.includes("mahasiswa")) {
+    return "Progress Saya";
+  }
+
   if (item.key === "bimbingan" && roles.includes("dosen_pembimbing")) {
     return "Bimbingan Mahasiswa";
+  }
+
+  if (item.key === "workflow-sidang" && roles.includes("staf_prodi")) {
+    return "Monitoring Workflow";
   }
 
   return item.label;
 }
 
 function getMenuGroup(item: MenuItem) {
-  if (["dashboard", "notifications"].includes(item.key)) {
-    return "Utama";
+  if (["dashboard", "workflow-dashboard"].includes(item.key)) {
+    return "Dashboard";
   }
 
   if (
-    [
-      "skripsi",
-      "seminar-review",
-      "assign-pembimbing",
-      "bimbingan",
-      "progress",
-      "jadwal-sidang",
-      "nilai-sidang",
-      "revisi-final"
-    ].includes(item.key)
+    ["skripsi", "workflow-sidang", "progress", "riwayat-workflow"].includes(
+      item.key
+    )
   ) {
     return "Akademik";
   }
 
-  if (["peminjaman-ruang", "master-data", "users"].includes(item.key)) {
+  if (["bimbingan", "assign-pembimbing"].includes(item.key)) {
+    return "Bimbingan";
+  }
+
+  if (
+    ["master-data", "users", "peminjaman-ruang", "laporan"].includes(item.key)
+  ) {
     return "Administrasi";
   }
 
-  if (["laporan", "audit-logs", "leaderboard"].includes(item.key)) {
+  if (["audit-logs", "notifications"].includes(item.key)) {
     return "Monitoring";
   }
 
-  return "Lainnya";
+  return "Monitoring";
 }
 
 function getCurrentPageLabel(pathname: string, roles: string[]) {
@@ -230,17 +250,27 @@ export default function DashboardLayout() {
   }, [hasPermission, hasRole]);
 
   const groupedMenu = useMemo(() => {
-    return visibleMenu.reduce<Record<string, MenuItem[]>>((groups, item) => {
-      const group = getMenuGroup(item);
+    const groups = visibleMenu.reduce<Record<string, MenuItem[]>>(
+      (result, item) => {
+        const group = getMenuGroup(item);
 
-      if (!groups[group]) {
-        groups[group] = [];
-      }
+        if (!result[group]) {
+          result[group] = [];
+        }
 
-      groups[group].push(item);
+        result[group].push(item);
 
-      return groups;
-    }, {});
+        return result;
+      },
+      {}
+    );
+
+    return menuGroupOrder
+      .filter((group) => groups[group]?.length)
+      .map((group) => ({
+        group,
+        items: groups[group]
+      }));
   }, [visibleMenu]);
 
   async function handleLogout() {
@@ -295,13 +325,14 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Navigasi aplikasi">
-          {menuGroupOrder
-            .filter((group) => groupedMenu[group]?.length)
-            .map((group) => (
-              <div key={group} className="sidebar-group">
-                <p className="sidebar-section-title">{group}</p>
+          {groupedMenu.map(({ group, items }) => (
+            <div key={group} className="sidebar-group sidebar-menu-group">
+              <p className="sidebar-section-title sidebar-menu-group-title">
+                {group}
+              </p>
 
-                {groupedMenu[group].map((item) => (
+              <div className="sidebar-menu-group-list">
+                {items.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -311,14 +342,17 @@ export default function DashboardLayout() {
                       isActive ? "nav-item active" : "nav-item"
                     }
                   >
-                    <span className="nav-icon" aria-hidden="true">
+                    <span className="nav-icon sidebar-link-icon" aria-hidden="true">
                       {item.icon}
                     </span>
-                    <span className="nav-label">{getMenuLabel(item, roles)}</span>
+                    <span className="nav-label sidebar-link-label">
+                      {getMenuLabel(item, roles)}
+                    </span>
                   </NavLink>
                 ))}
               </div>
-            ))}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
