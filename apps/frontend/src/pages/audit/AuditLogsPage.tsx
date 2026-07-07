@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { getAuditLogs, type AuditLogItem } from "../../services/auditLogs";
@@ -90,126 +90,118 @@ export default function AuditLogsPage() {
       />
 
       <section className="list-card audit-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Riwayat Aktivitas Sistem</h2>
-            <p className="muted">
-              Pantau method, endpoint, user, IP, status response, dan payload request.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari path/action, contoh: /api/finalisasi"
-            />
-
-            <select
-              value={method}
-              onChange={(event) => setMethod(event.target.value)}
+        <DataTable
+          data={filteredRows}
+          isLoading={auditQuery.isLoading}
+          emptyMessage="Belum ada audit log"
+          toolbar={
+            <FilterToolbar
+              title="Audit Log"
+              description="Monitor seluruh aktivitas penting yang terjadi di sistem Sisidang."
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari path/action, contoh: /api/finalisasi"
             >
-              <option value="">Semua Method</option>
-              {methodOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+              <div className="filter-field">
+                <label>Method</label>
+                <select
+                  value={method}
+                  onChange={(event) => setMethod(event.target.value)}
+                >
+                  <option value="">Semua Method</option>
+                  {methodOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="">Semua Status</option>
-              <option value="SUCCESS">SUCCESS</option>
-              <option value="ERROR">ERROR</option>
-            </select>
-          </div>
-        </div>
-
-        {auditQuery.isLoading ? (
-          <EmptyState
-            title="Memuat audit log..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : (
-          <DataTable
-            data={filteredRows}
-            emptyMessage="Belum ada audit log"
-            columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (_item, index) => index + 1
-              },
-              {
-                key: "time",
-                header: "Waktu",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{formatDate(item.createdAt)}</strong>
-                    <span>{item.ip || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "method",
-                header: "Method",
-                align: "center",
-                render: (item) => <StatusBadge value={item.method} size="sm" />
-              },
-              {
-                key: "path",
-                header: "Path",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.path}</strong>
-                    <span>{item.action || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "user",
-                header: "User",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.user?.name || "-"}</strong>
-                    <span>{item.user?.identifier || item.user?.email || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (item) => (
-                  <div className="table-title-cell table-center-cell">
-                    <StatusBadge value={getStatusLabel(item.statusCode)} size="sm" />
-                    <span>{item.statusCode || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (item) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => openDetailDrawer(item)}
-                    >
-                      Detail
-                    </button>
-                  </div>
-                )
-              }
-            ]}
-          />
-        )}
+              <div className="filter-field">
+                <label>Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="">Semua Status</option>
+                  <option value="SUCCESS">SUCCESS</option>
+                  <option value="ERROR">ERROR</option>
+                </select>
+              </div>
+            </FilterToolbar>
+          }
+          columns={[
+            {
+              key: "no",
+              header: "No",
+              align: "center",
+              render: (_item, index) => index + 1
+            },
+            {
+              key: "time",
+              header: "Waktu",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{formatDate(item.createdAt)}</strong>
+                  <span>{item.ip || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "method",
+              header: "Method",
+              align: "center",
+              render: (item) => <StatusBadge value={item.method} size="sm" />
+            },
+            {
+              key: "path",
+              header: "Path",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{item.path}</strong>
+                  <span>{item.action || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "user",
+              header: "User",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{item.user?.name || "-"}</strong>
+                  <span>{item.user?.identifier || item.user?.email || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "status",
+              header: "Status",
+              align: "center",
+              render: (item) => (
+                <div className="table-title-cell table-center-cell">
+                  <StatusBadge value={getStatusLabel(item.statusCode)} size="sm" />
+                  <span>{item.statusCode || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "actions",
+              header: "Aksi",
+              align: "right",
+              render: (item) => (
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => openDetailDrawer(item)}
+                  >
+                    Detail
+                  </button>
+                </div>
+              )
+            }
+          ]}
+        />
       </section>
 
       {drawerMode === "detail" && selectedLog ? (

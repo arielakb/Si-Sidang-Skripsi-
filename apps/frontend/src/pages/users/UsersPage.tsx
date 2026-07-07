@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import {
@@ -132,9 +132,8 @@ export default function UsersPage() {
     return users.filter((user) => {
       const roleSlugs = getRoleSlugs(user);
 
-      const matchesSearch = `${user.name} ${user.identifier} ${
-        user.email ?? ""
-      } ${roleSlugs.join(" ")} ${user.status}`
+      const matchesSearch = `${user.name} ${user.identifier} ${user.email ?? ""
+        } ${roleSlugs.join(" ")} ${user.status}`
         .toLowerCase()
         .includes(keyword);
 
@@ -359,21 +358,21 @@ export default function UsersPage() {
   }
 
   function handleDeletePermanent(user: UserRow) {
-  if (currentUser?.id === user.id) {
-    setPageError("Anda tidak dapat menghapus akun sendiri.");
-    return;
+    if (currentUser?.id === user.id) {
+      setPageError("Anda tidak dapat menghapus akun sendiri.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Hapus permanen user "${user.name}"? Data yang sudah dihapus tidak dapat dikembalikan.`
+    );
+
+    if (!confirmed) return;
+
+    setPageError("");
+    setSuccessMessage("");
+    deleteMutation.mutate(user.id);
   }
-
-  const confirmed = window.confirm(
-    `Hapus permanen user "${user.name}"? Data yang sudah dihapus tidak dapat dikembalikan.`
-  );
-
-  if (!confirmed) return;
-
-  setPageError("");
-  setSuccessMessage("");
-  deleteMutation.mutate(user.id);
-}
 
   return (
     <section className="page-stack">
@@ -392,170 +391,163 @@ export default function UsersPage() {
       ) : null}
 
       <section className="list-card users-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Daftar User</h2>
-            <p className="muted">
-              List akun pengguna berdasarkan identifier, email, role, dan status.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari nama, NPM/NIP, email..."
-            />
-
-            <select
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
+        <DataTable
+          data={filteredUsers}
+          isLoading={usersQuery.isLoading}
+          emptyMessage="Belum ada user sesuai filter"
+          toolbar={
+            <FilterToolbar
+              title="Daftar User"
+              description="List akun pengguna berdasarkan identifier, email, role, dan status."
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari nama, NPM/NIP, email..."
+              action={
+                canCreateUser ? (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={openCreateDrawer}
+                  >
+                    Tambah User
+                  </button>
+                ) : null
+              }
             >
-              <option value="">Semua Role</option>
-              {roleOptions.map((role) => (
-                <option key={role.slug} value={role.slug}>
-                  {role.label}
-                </option>
-              ))}
-            </select>
+              <div className="filter-field">
+                <label>Role</label>
+                <select
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
+                >
+                  <option value="">Semua Role</option>
+                  {roleOptions.map((role) => (
+                    <option key={role.slug} value={role.slug}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="">Semua Status</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="INACTIVE">INACTIVE</option>
-            </select>
+              <div className="filter-field">
+                <label>Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="">Semua Status</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
+            </FilterToolbar>
+          }
+          columns={[
+            {
+              key: "no",
+              header: "No",
+              align: "center",
+              render: (_item, index) => index + 1
+            },
+            {
+              key: "name",
+              header: "Nama",
+              render: (user) => (
+                <div className="table-title-cell">
+                  <strong>{user.name}</strong>
+                  <span>{user.email || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "identifier",
+              header: "Identifier",
+              render: (user) => user.identifier
+            },
+            {
+              key: "roles",
+              header: "Role",
+              render: (user) => (
+                <div className="user-role-chip-list">
+                  {getRoleSlugs(user).length === 0 ? (
+                    <span className="muted">Belum ada role</span>
+                  ) : (
+                    getRoleSlugs(user).map((slug) => (
+                      <span key={slug} className="user-role-chip">
+                        {roleOptions.find((role) => role.slug === slug)
+                          ?.label || slug}
+                      </span>
+                    ))
+                  )}
+                </div>
+              )
+            },
+            {
+              key: "status",
+              header: "Status",
+              align: "center",
+              render: (user) => <StatusBadge value={user.status} size="sm" />
+            },
+            {
+              key: "actions",
+              header: "Aksi",
+              align: "right",
+              render: (user) => (
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => openDetailDrawer(user)}
+                  >
+                    Detail
+                  </button>
 
-            {canCreateUser ? (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={openCreateDrawer}
-              >
-                Tambah User
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {usersQuery.isLoading ? (
-          <EmptyState
-            title="Memuat user..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : (
-          <DataTable
-            data={filteredUsers}
-            emptyMessage="Belum ada user"
-            columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (_item, index) => index + 1
-              },
-              {
-                key: "name",
-                header: "Nama",
-                render: (user) => (
-                  <div className="table-title-cell">
-                    <strong>{user.name}</strong>
-                    <span>{user.email || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "identifier",
-                header: "Identifier",
-                render: (user) => user.identifier
-              },
-              {
-                key: "roles",
-                header: "Role",
-                render: (user) => (
-                  <div className="user-role-chip-list">
-                    {getRoleSlugs(user).length === 0 ? (
-                      <span className="muted">Belum ada role</span>
-                    ) : (
-                      getRoleSlugs(user).map((slug) => (
-                        <span key={slug} className="user-role-chip">
-                          {roleOptions.find((role) => role.slug === slug)
-                            ?.label || slug}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                )
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (user) => <StatusBadge value={user.status} size="sm" />
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (user) => (
-                  <div className="table-actions">
+                  {canUpdateUser ? (
                     <button
                       type="button"
-                      className="secondary-button"
-                      onClick={() => openDetailDrawer(user)}
+                      className={
+                        user.status === "ACTIVE"
+                          ? "danger-button"
+                          : "primary-button"
+                      }
+                      disabled={
+                        statusMutation.isPending ||
+                        currentUser?.id === user.id
+                      }
+                      onClick={() => handleToggleStatus(user)}
+                      title={
+                        currentUser?.id === user.id
+                          ? "Tidak dapat menonaktifkan akun sendiri"
+                          : undefined
+                      }
                     >
-                      Detail
+                      {user.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
                     </button>
+                  ) : null}
 
-                    {canUpdateUser ? (
-                      <button
-                        type="button"
-                        className={
-                          user.status === "ACTIVE"
-                            ? "danger-button"
-                            : "primary-button"
-                        }
-                        disabled={
-                          statusMutation.isPending ||
-                          currentUser?.id === user.id
-                        }
-                        onClick={() => handleToggleStatus(user)}
-                        title={
-                          currentUser?.id === user.id
-                            ? "Tidak dapat menonaktifkan akun sendiri"
-                            : undefined
-                        }
-                      >
-                        {user.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
-                      </button>
-                    ) : null}
-
-                    {canDeletePermanent ? (
-                      <button
-                        type="button"
-                        className="danger-button"
-                        disabled={
-                          deleteMutation.isPending ||
-                          currentUser?.id === user.id
-                        }
-                        onClick={() => handleDeletePermanent(user)}
-                        title={
-                          currentUser?.id === user.id
-                            ? "Tidak dapat menghapus akun sendiri"
-                            : undefined
-                        }
-                      >
-                        Hapus Permanen
-                      </button>
-                    ) : null}
-                  </div>
-                )
-              }
-            ]}
-          />
-        )}
+                  {canDeletePermanent ? (
+                    <button
+                      type="button"
+                      className="danger-button"
+                      disabled={
+                        deleteMutation.isPending ||
+                        currentUser?.id === user.id
+                      }
+                      onClick={() => handleDeletePermanent(user)}
+                      title={
+                        currentUser?.id === user.id
+                          ? "Tidak dapat menghapus akun sendiri"
+                          : undefined
+                      }
+                    >
+                      Hapus Permanen
+                    </button>
+                  ) : null}
+                </div>
+              )
+            }
+          ]}
+        />
       </section>
 
       {drawerMode ? (
@@ -655,38 +647,48 @@ export default function UsersPage() {
                 </button>
               </form>
             ) : selectedUser ? (
-              <div className="users-detail-stack">
-                <div className="skripsi-detail-title">
-                  <strong>{selectedUser.name}</strong>
-                  <StatusBadge value={selectedUser.status} />
-                </div>
-
-                <div className="info-list">
-                  <div className="info-row">
-                    <span>Identifier</span>
-                    <strong>{selectedUser.identifier}</strong>
+              <div className="page-stack">
+                <div className="workflow-history-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                  <div>
+                    <p className="eyebrow" style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                      {selectedUser.identifier || "-"}
+                    </p>
+                    <h2 style={{ fontSize: "24px", fontWeight: 700, marginBottom: "4px", color: "var(--on-surface)" }}>
+                      {selectedUser.name}
+                    </h2>
+                    <p className="muted" style={{ color: "var(--on-surface-variant)", fontSize: "14px" }}>
+                      {selectedUser.email || "Tanpa email"}
+                    </p>
                   </div>
 
-                  <div className="info-row">
-                    <span>Email</span>
-                    <strong>{selectedUser.email || "-"}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Status</span>
-                    <strong>{selectedUser.status}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Role Saat Ini</span>
-                    <p>{getRoleLabels(getRoleSlugs(selectedUser)) || "-"}</p>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Dibuat</span>
-                    <strong>{formatDate(selectedUser.createdAt)}</strong>
+                  <div className="workflow-final-status" style={{ textAlign: "right" }}>
+                    <StatusBadge value={selectedUser.status} size="md" />
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--on-surface-variant)", fontWeight: 600 }}>
+                      Manajemen User
+                    </div>
                   </div>
                 </div>
+
+                <div className="workflow-progress-track" style={{ height: "4px", backgroundColor: "var(--surface-container-high)", borderRadius: "4px", overflow: "hidden", marginBottom: "24px" }}>
+                  <span style={{ display: "block", height: "100%", width: "100%", backgroundColor: "var(--primary)" }} />
+                </div>
+
+                <DataTable<any>
+                  data={[
+                    { label: "Identifier", value: selectedUser.identifier },
+                    { label: "Email", value: selectedUser.email || "-" },
+                    { label: "Status", value: selectedUser.status },
+                    { label: "Role Saat Ini", value: getRoleLabels(getRoleSlugs(selectedUser)) || "-" },
+                    { label: "Dibuat", value: formatDate(selectedUser.createdAt) }
+                  ]}
+                  columns={[
+                    { key: "label", header: "Informasi", width: "40%", render: (item) => <strong>{item.label}</strong> },
+                    { key: "value", header: "Detail", render: (item) => item.value }
+                  ]}
+                  compact
+                  emptyMessage="Tidak ada data."
+                  getRowKey={(item) => item.label}
+                />
 
                 {canAssignRole ? (
                   <div className="drawer-section">
@@ -741,28 +743,28 @@ export default function UsersPage() {
                     </button>
                   </div>
                 ) : null}
-              {canDeletePermanent ? (
-                <div className="drawer-section danger-zone">
-                  <h3>Hapus Permanen</h3>
-                  <p className="muted">
-                    Hapus permanen hanya bisa dilakukan jika user belum memiliki data akademik.
-                    Jika user sudah pernah digunakan pada skripsi, bimbingan, berkas, atau nilai,
-                    gunakan Nonaktifkan.
-                  </p>
+                {canDeletePermanent ? (
+                  <div className="drawer-section danger-zone">
+                    <h3>Hapus Permanen</h3>
+                    <p className="muted">
+                      Hapus permanen hanya bisa dilakukan jika user belum memiliki data akademik.
+                      Jika user sudah pernah digunakan pada skripsi, bimbingan, berkas, atau nilai,
+                      gunakan Nonaktifkan.
+                    </p>
 
-                  <button
-                    type="button"
-                    className="danger-button"
-                    disabled={
-                      deleteMutation.isPending ||
-                      currentUser?.id === selectedUser.id
-                    }
-                    onClick={() => handleDeletePermanent(selectedUser)}
-                  >
-                    {deleteMutation.isPending ? "Menghapus..." : "Hapus Permanen User"}
-                  </button>
-                </div>
-              ) : null}
+                    <button
+                      type="button"
+                      className="danger-button"
+                      disabled={
+                        deleteMutation.isPending ||
+                        currentUser?.id === selectedUser.id
+                      }
+                      onClick={() => handleDeletePermanent(selectedUser)}
+                    >
+                      {deleteMutation.isPending ? "Menghapus..." : "Hapus Permanen User"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </aside>

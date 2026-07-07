@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import MetricCard from "../../components/ui/MetricCard";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -108,9 +108,8 @@ export default function NotificationsPage() {
     return notifications.filter((item) => {
       const isRead = isNotificationRead(item);
 
-      const matchesSearch = `${item.title ?? ""} ${getMessage(item)} ${
-        item.type ?? ""
-      }`
+      const matchesSearch = `${item.title ?? ""} ${getMessage(item)} ${item.type ?? ""
+        }`
         .toLowerCase()
         .includes(keyword);
 
@@ -222,141 +221,129 @@ export default function NotificationsPage() {
       </div>
 
       <section className="list-card notifications-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Daftar Notifikasi</h2>
-            <p className="muted">
-              List notifikasi berdasarkan waktu, jenis, status baca, dan pesan.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari judul atau pesan..."
-            />
-
-            <select
-              value={readFilter}
-              onChange={(event) => setReadFilter(event.target.value)}
+        <DataTable
+          data={filteredRows}
+          isLoading={notificationsQuery.isLoading}
+          emptyMessage={notificationsQuery.isError ? "Gagal memuat notifikasi. Coba muat ulang halaman." : "Belum ada notifikasi"}
+          toolbar={
+            <FilterToolbar
+              title="Daftar Notifikasi"
+              description="List notifikasi berdasarkan waktu, jenis, status baca, dan pesan."
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari judul atau pesan..."
+              action={
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={markAllReadMutation.isPending || unreadCount === 0}
+                  onClick={() => markAllReadMutation.mutate()}
+                >
+                  {markAllReadMutation.isPending
+                    ? "Memproses..."
+                    : "Tandai Semua Dibaca"}
+                </button>
+              }
             >
-              <option value="">Semua Status</option>
-              <option value="UNREAD">Belum Dibaca</option>
-              <option value="READ">Sudah Dibaca</option>
-            </select>
+              <div className="filter-field">
+                <label>Status</label>
+                <select
+                  value={readFilter}
+                  onChange={(event) => setReadFilter(event.target.value)}
+                >
+                  <option value="">Semua Status</option>
+                  <option value="UNREAD">Belum Dibaca</option>
+                  <option value="READ">Sudah Dibaca</option>
+                </select>
+              </div>
 
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-            >
-              <option value="">Semua Jenis</option>
-              {typeOptions.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+              <div className="filter-field">
+                <label>Jenis</label>
+                <select
+                  value={typeFilter}
+                  onChange={(event) => setTypeFilter(event.target.value)}
+                >
+                  <option value="">Semua Jenis</option>
+                  {typeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </FilterToolbar>
+          }
+          columns={[
+            {
+              key: "no",
+              header: "No",
+              align: "center",
+              render: (_item, index) => index + 1
+            },
+            {
+              key: "time",
+              header: "Waktu",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{formatDate(item.createdAt)}</strong>
+                  <span>{item.type || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "title",
+              header: "Judul",
+              render: (item) => (
+                <div className="table-title-cell notification-title-cell">
+                  <strong>{item.title || "Tanpa judul"}</strong>
+                  <span>{getMessage(item)}</span>
+                </div>
+              )
+            },
+            {
+              key: "status",
+              header: "Status",
+              align: "center",
+              render: (item) => (
+                <StatusBadge
+                  value={isNotificationRead(item) ? "DIBACA" : "BELUM_DIBACA"}
+                  size="sm"
+                />
+              )
+            },
+            {
+              key: "actions",
+              header: "Aksi",
+              align: "right",
+              render: (item) => {
+                const isRead = isNotificationRead(item);
 
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={markAllReadMutation.isPending || unreadCount === 0}
-              onClick={() => markAllReadMutation.mutate()}
-            >
-              {markAllReadMutation.isPending
-                ? "Memproses..."
-                : "Tandai Semua Dibaca"}
-            </button>
-          </div>
-        </div>
+                return (
+                  <div className="table-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => openDetailDrawer(item)}
+                    >
+                      Detail
+                    </button>
 
-        {notificationsQuery.isLoading ? (
-          <EmptyState
-            title="Memuat notifikasi..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : notificationsQuery.isError ? (
-          <EmptyState
-            title="Gagal memuat notifikasi"
-            description="Coba muat ulang halaman atau periksa koneksi backend."
-          />
-        ) : (
-          <DataTable
-            data={filteredRows}
-            emptyMessage="Belum ada notifikasi"
-            columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (_item, index) => index + 1
-              },
-              {
-                key: "time",
-                header: "Waktu",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{formatDate(item.createdAt)}</strong>
-                    <span>{item.type || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "title",
-                header: "Judul",
-                render: (item) => (
-                  <div className="table-title-cell notification-title-cell">
-                    <strong>{item.title || "Tanpa judul"}</strong>
-                    <span>{getMessage(item)}</span>
-                  </div>
-                )
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (item) => (
-                  <StatusBadge
-                    value={isNotificationRead(item) ? "DIBACA" : "BELUM_DIBACA"}
-                    size="sm"
-                  />
-                )
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (item) => {
-                  const isRead = isNotificationRead(item);
-
-                  return (
-                    <div className="table-actions">
+                    {!isRead ? (
                       <button
                         type="button"
-                        className="secondary-button"
-                        onClick={() => openDetailDrawer(item)}
+                        className="primary-button"
+                        disabled={markReadMutation.isPending}
+                        onClick={() => markReadMutation.mutate(item.id)}
                       >
-                        Detail
+                        Tandai Dibaca
                       </button>
-
-                      {!isRead ? (
-                        <button
-                          type="button"
-                          className="primary-button"
-                          disabled={markReadMutation.isPending}
-                          onClick={() => markReadMutation.mutate(item.id)}
-                        >
-                          Tandai Dibaca
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                }
+                    ) : null}
+                  </div>
+                );
               }
-            ]}
-          />
-        )}
+            }
+          ]}
+        />
       </section>
 
       {drawerMode === "detail" && selectedNotification ? (

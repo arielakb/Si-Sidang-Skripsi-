@@ -29,13 +29,13 @@ const menuItems: MenuItem[] = [
     key: "dashboard",
     label: "Dashboard",
     to: "/app",
-    icon: "⌂"
+    icon: "dashboard"
   },
   {
     key: "workflow-dashboard",
     label: "Dashboard Workflow",
     to: "/app/workflow-dashboard",
-    icon: "▦",
+    icon: "space_dashboard",
     roles: WORKFLOW_ROLES,
     permissions: ["sidang.read"]
   },
@@ -43,14 +43,14 @@ const menuItems: MenuItem[] = [
     key: "skripsi",
     label: "Data Skripsi",
     to: "/app/skripsi",
-    icon: "□",
+    icon: "description",
     roles: ["admin", "mahasiswa", "dosen_koordinator", "ketua_prodi"]
   },
   {
     key: "workflow-sidang",
     label: "Workflow Sidang",
     to: "/app/workflow-sidang",
-    icon: "⇄",
+    icon: "sync_alt",
     roles: WORKFLOW_ROLES,
     permissions: ["sidang.read"]
   },
@@ -58,7 +58,7 @@ const menuItems: MenuItem[] = [
     key: "progress",
     label: "Progress Akademik",
     to: "/app/progress",
-    icon: "↗",
+    icon: "trending_up",
     roles: WORKFLOW_ROLES,
     permissions: ["sidang.read"]
   },
@@ -66,7 +66,7 @@ const menuItems: MenuItem[] = [
     key: "riwayat-workflow",
     label: "Riwayat Sidang",
     to: "/app/sidang/riwayat-workflow",
-    icon: "▣",
+    icon: "history",
     roles: WORKFLOW_ROLES,
     permissions: ["sidang.read"]
   },
@@ -74,7 +74,7 @@ const menuItems: MenuItem[] = [
     key: "bimbingan",
     label: "Bimbingan",
     to: "/app/bimbingan",
-    icon: "◌",
+    icon: "groups",
     roles: ["admin", "mahasiswa", "dosen_pembimbing"],
     permissions: ["bimbingan.read"]
   },
@@ -82,7 +82,7 @@ const menuItems: MenuItem[] = [
     key: "assign-pembimbing",
     label: "Assign Pembimbing",
     to: "/app/assign-pembimbing",
-    icon: "+",
+    icon: "person_add",
     roles: ["admin", "dosen_koordinator", "ketua_prodi"],
     permissions: ["skripsi.assign_dosen"]
   },
@@ -90,14 +90,14 @@ const menuItems: MenuItem[] = [
     key: "peminjaman-ruang",
     label: "Peminjaman Ruang",
     to: "/app/peminjaman-ruang",
-    icon: "▣",
+    icon: "meeting_room",
     roles: ["admin", "mahasiswa", "staf_prodi"]
   },
   {
     key: "master-data",
     label: "Master Data",
     to: "/app/master-data",
-    icon: "≡",
+    icon: "dataset",
     roles: ["admin", "dosen_koordinator", "ketua_prodi", "staf_prodi"],
     permissions: ["master_data.read"]
   },
@@ -105,7 +105,7 @@ const menuItems: MenuItem[] = [
     key: "laporan",
     label: "Laporan",
     to: "/app/laporan",
-    icon: "▤",
+    icon: "analytics",
     roles: ["admin", "dosen_koordinator", "ketua_prodi"],
     permissions: ["laporan.read"]
   },
@@ -113,7 +113,7 @@ const menuItems: MenuItem[] = [
     key: "users",
     label: "User Management",
     to: "/app/users",
-    icon: "◉",
+    icon: "manage_accounts",
     roles: ["admin", "ketua_prodi"],
     permissions: ["user.read"]
   },
@@ -121,7 +121,7 @@ const menuItems: MenuItem[] = [
     key: "audit-logs",
     label: "Audit Log",
     to: "/app/audit-logs",
-    icon: "◇",
+    icon: "manage_search",
     roles: ["admin", "ketua_prodi"],
     permissions: ["audit.read"]
   },
@@ -129,7 +129,7 @@ const menuItems: MenuItem[] = [
     key: "notifications",
     label: "Notifikasi",
     to: "/app/notifications",
-    icon: "●",
+    icon: "notifications",
     roles: [
       "admin",
       "mahasiswa",
@@ -301,7 +301,7 @@ export default function DashboardLayout() {
             aria-label="Tutup sidebar"
             onClick={closeSidebar}
           >
-            ×
+            <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
@@ -342,7 +342,7 @@ export default function DashboardLayout() {
                       isActive ? "nav-item active" : "nav-item"
                     }
                   >
-                    <span className="nav-icon sidebar-link-icon" aria-hidden="true">
+                    <span className="nav-icon sidebar-link-icon material-symbols-outlined" aria-hidden="true">
                       {item.icon}
                     </span>
                     <span className="nav-label sidebar-link-label">
@@ -357,7 +357,7 @@ export default function DashboardLayout() {
 
         <div className="sidebar-footer">
           <a href="/" className="public-link" onClick={closeSidebar}>
-            <span>↗</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>open_in_new</span>
             Dashboard Publik
           </a>
         </div>
@@ -372,31 +372,46 @@ export default function DashboardLayout() {
               aria-label="Buka menu"
               onClick={() => setIsSidebarOpen(true)}
             >
-              ☰
+              <span className="material-symbols-outlined">menu</span>
             </button>
 
-            <div className="topbar-page">
+            <div className="input-with-icon" style={{ width: '280px', display: 'none' }}>
+              <span className="material-symbols-outlined">search</span>
+              <input type="text" placeholder="Search thesis, students..." />
+            </div>
+
+            <div className="topbar-page" style={{ marginLeft: '16px' }}>
               <p className="eyebrow">Sisidang TI</p>
               <strong>{currentPageLabel}</strong>
-              <small>Program Studi Teknik Informatika</small>
             </div>
           </div>
 
           <div className="topbar-actions">
+            <button className="ghost-button" style={{ padding: '8px', color: 'var(--on-surface-variant)' }}>
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
+            <button className="ghost-button" style={{ padding: '8px', color: 'var(--on-surface-variant)' }}>
+              <span className="material-symbols-outlined">apps</span>
+            </button>
+
+            <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--outline-variant)', margin: '0 8px' }}></div>
+
             <div className="topbar-user topbar-user-rich">
               <UserAvatar name={user?.name} size="sm" />
               <div>
-                <small>{roleLabel}</small>
                 <strong>{user?.name || "User"}</strong>
+                <small>{roleLabel}</small>
               </div>
             </div>
 
             <button
               type="button"
-              className="secondary-button logout-button"
+              className="ghost-button logout-button"
               onClick={handleLogout}
+              title="Logout"
+              style={{ padding: '8px', color: 'var(--error)' }}
             >
-              Logout
+              <span className="material-symbols-outlined">logout</span>
             </button>
           </div>
         </header>

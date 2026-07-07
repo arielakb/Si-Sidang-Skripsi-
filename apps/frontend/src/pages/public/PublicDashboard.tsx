@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
+import DetailPanel from "../../components/ui/DetailPanel";
 import EmptyState from "../../components/ui/EmptyState";
 import FilterToolbar from "../../components/ui/FilterToolbar";
 import SectionCard from "../../components/ui/SectionCard";
@@ -481,88 +482,71 @@ export default function PublicDashboard() {
             />
           )}
         </SectionCard>
-
-        {selectedJadwalId ? (
-          <section className="public-detail-panel">
-            <div className="public-detail-head">
+        <DetailPanel
+        open={Boolean(selectedJadwalId)}
+        title="Detail Jadwal Publik"
+        subtitle="Informasi publik tanpa nilai internal"
+        width="lg"
+        onClose={closeDetail}
+      >
+        {selectedJadwalQuery.isLoading ? (
+          <EmptyState
+            title="Memuat detail jadwal..."
+            description="Mohon tunggu sebentar."
+          />
+        ) : selectedJadwal ? (
+          <div className="page-stack">
+            <div className="workflow-history-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
               <div>
-                <p className="eyebrow">Detail Jadwal Publik</p>
-                <h2>
-                  {selectedJadwal
-                    ? getJenisSidangLabel(selectedJadwal)
-                    : "Memuat detail..."}
+                <p className="eyebrow" style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                  {selectedJadwal.skripsi?.mahasiswa?.identifier || "-"}
+                </p>
+                <h2 style={{ fontSize: "24px", fontWeight: 700, marginBottom: "4px", color: "var(--on-surface)" }}>
+                  {selectedJadwal.skripsi?.mahasiswa?.name || "-"}
                 </h2>
+                <p className="muted" style={{ color: "var(--on-surface-variant)", fontSize: "14px" }}>
+                  {selectedJadwal.skripsi?.title || "Tanpa judul"}
+                </p>
               </div>
 
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={closeDetail}
-              >
-                Tutup
-              </button>
+              <div className="workflow-final-status" style={{ textAlign: "right" }}>
+                <StatusBadge value={selectedJadwal.status} size="md" />
+                <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--on-surface-variant)", fontWeight: 600 }}>
+                  {getJenisSidangLabel(selectedJadwal)}
+                </div>
+              </div>
             </div>
 
-            {selectedJadwalQuery.isLoading ? (
-              <EmptyState
-                title="Memuat detail jadwal..."
-                description="Mohon tunggu sebentar."
-              />
-            ) : selectedJadwal ? (
-              <div className="public-detail-grid">
-                <article>
-                  <span>Mahasiswa</span>
-                  <strong>{selectedJadwal.skripsi?.mahasiswa?.name || "-"}</strong>
-                  <small>
-                    {selectedJadwal.skripsi?.mahasiswa?.identifier || "-"}
-                  </small>
-                </article>
+            <div className="workflow-progress-track" style={{ height: "4px", backgroundColor: "var(--surface-container-high)", borderRadius: "4px", overflow: "hidden", marginBottom: "24px" }}>
+              <span style={{ display: "block", height: "100%", width: "100%", backgroundColor: "var(--primary)" }} />
+            </div>
 
-                <article>
-                  <span>Judul Skripsi</span>
-                  <strong>{selectedJadwal.skripsi?.title || "Tanpa judul"}</strong>
-                  <small>{selectedJadwal.skripsi?.peminatan?.name || "-"}</small>
-                </article>
-
-                <article>
-                  <span>Jenis Sidang</span>
-                  <strong>{getJenisSidangLabel(selectedJadwal)}</strong>
-                  <small>Status sidang: {selectedJadwal.sidangStatus || "-"}</small>
-                </article>
-
-                <article>
-                  <span>Jadwal</span>
-                  <strong>{formatDateOnly(selectedJadwal.tanggal)}</strong>
-                  <small>
-                    {formatDateTime(selectedJadwal.waktuMulai)} -{" "}
-                    {formatDateTime(selectedJadwal.waktuSelesai)}
-                  </small>
-                </article>
-
-                <article>
-                  <span>Ruang / Lokasi</span>
-                  <strong>{getRoomLabel(selectedJadwal)}</strong>
-                  <small>
-                    {selectedJadwal.linkVicon ? "Online / hybrid" : "Tatap muka"}
-                  </small>
-                </article>
-
-                <article>
-                  <span>Status Jadwal</span>
-                  <strong>
-                    <StatusBadge value={selectedJadwal.status} size="sm" />
-                  </strong>
-                  <small>Informasi publik tanpa nilai/catatan internal.</small>
-                </article>
-              </div>
-            ) : (
-              <EmptyState
-                title="Detail jadwal tidak ditemukan"
-                description="Jadwal mungkin sudah diubah atau tidak tersedia."
-              />
-            )}
-          </section>
-        ) : null}
+            <DataTable<any>
+              data={[
+                { label: "Peminatan", value: selectedJadwal.skripsi?.peminatan?.name || "-" },
+                { label: "Jenis Sidang", value: getJenisSidangLabel(selectedJadwal) },
+                { label: "Tanggal", value: formatDateOnly(selectedJadwal.tanggal) },
+                { label: "Waktu", value: `${formatDateTime(selectedJadwal.waktuMulai)} - ${formatDateTime(selectedJadwal.waktuSelesai)}` },
+                { label: "Ruang / Lokasi", value: getRoomLabel(selectedJadwal) },
+                { label: "Mode", value: selectedJadwal.linkVicon ? "Online / Hybrid" : "Tatap Muka" },
+                { label: "Status Sidang", value: selectedJadwal.sidangStatus || "-" }
+              ]}
+              columns={[
+                { key: "label", header: "Informasi", width: "30%", render: (item) => <strong>{item.label}</strong> },
+                { key: "value", header: "Detail", render: (item) => item.value }
+              ]}
+              compact
+              emptyMessage="Tidak ada data."
+              getRowKey={(item) => item.label}
+            />
+          </div>
+        ) : (
+          <EmptyState
+            title="Detail jadwal tidak ditemukan"
+            description="Jadwal mungkin sudah diubah atau tidak tersedia."
+          />
+        )}
+      </DetailPanel>
       </section>
     </main>
   );

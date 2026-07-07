@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Thesis Management System - Workflow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#9fbfff",
+                        "surface-dim": "#d8dadc",
+                        "primary-fixed-dim": "#acc7ff",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "on-primary-fixed-variant": "#004591",
+                        "surface-container-highest": "#e0e3e5",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-secondary-container": "#735800",
+                        "secondary-fixed-dim": "#f0c03e",
+                        "tertiary-fixed": "#dae2fd",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#131b2e",
+                        "on-secondary-fixed": "#251a00",
+                        "surface-tint": "#265dad",
+                        "on-secondary-fixed-variant": "#594400",
+                        "outline-variant": "#c3c6d3",
+                        "secondary-container": "#ffce4b",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#454d62",
+                        "on-surface": "#191c1e",
+                        "surface-container-high": "#e6e8ea",
+                        "outline": "#737783",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "primary-fixed": "#d7e2ff",
+                        "surface-container-low": "#f2f4f6",
+                        "on-tertiary-container": "#b6bed8",
+                        "inverse-primary": "#acc7ff",
+                        "primary-container": "#064b9b",
+                        "error-container": "#ffdad6",
+                        "on-background": "#191c1e",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "secondary": "#765a00",
+                        "tertiary": "#2e364b",
+                        "on-primary-fixed": "#001a40",
+                        "surface-bright": "#f7f9fb",
+                        "on-surface-variant": "#424751",
+                        "background": "#f7f9fb",
+                        "primary": "#003572",
+                        "surface": "#f7f9fb",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#ffdf95",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "surface-container": "#eceef0",
+                        "status-success": "#15803d",
+                        "status-success-bg": "#dcfce7",
+                        "status-warning": "#a16207",
+                        "status-warning-bg": "#fef08a",
+                        "status-error": "#b91c1c",
+                        "status-error-bg": "#fee2e2"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "3xl": "64px",
+                        "base": "8px",
+                        "md": "16px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "gutter": "24px",
+                        "xl": "32px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "h1-mobile": ["Inter"],
+                        "h3": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h2": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "h1": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h1-mobile": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "h1": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="w-64 h-full fixed left-0 top-0 hidden md:flex flex-col border-r border-outline-variant bg-surface-container-lowest py-lg px-md gap-base z-50">
+<div class="mb-xl px-sm">
+<h2 class="font-h2 text-h2 font-bold text-primary">Sisidang TI</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-xs uppercase tracking-wider">Thesis Management System</p>
+</div>
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md py-sm px-md rounded-lg mb-lg hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+            New Thesis Submission
+        </button>
+<nav class="flex flex-col gap-sm flex-grow">
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-on-surface-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-primary font-bold border-r-4 border-primary font-body-md text-body-md bg-surface-container-low" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+<span>Thesis Management</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-on-surface-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span>Schedule</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-on-surface-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Users</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-on-surface-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-on-surface-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">help</span>
+<span>Help</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant pt-md">
+<a class="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150 text-on-surface-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col min-h-screen md:ml-64 w-full">
+<!-- TopNavBar -->
+<header class="docked full-width top-0 z-40 border-b border-outline-variant shadow-sm bg-surface-container-lowest flex justify-between items-center px-lg py-md sticky">
+<div class="flex items-center gap-md">
+<div class="md:hidden">
+<span class="font-h3 text-h3 font-bold text-primary">Sisidang TI</span>
+</div>
+<div class="hidden md:flex items-center bg-surface-container-low rounded-full px-md py-sm border border-outline-variant focus-within:border-primary transition-colors">
+<span class="material-symbols-outlined text-outline mr-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 font-body-sm text-body-sm text-on-surface w-64 placeholder:text-outline" placeholder="Search thesis, students..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="text-on-surface-variant hover:text-primary transition-all p-sm rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-all p-sm rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined">apps</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary-fixed overflow-hidden flex items-center justify-center border border-outline-variant cursor-pointer ml-sm">
+<img alt="Profile" class="w-full h-full object-cover" data-alt="Professional headshot of an academic advisor in a modern office setting. Bright, clear lighting highlighting a friendly but professional demeanor. Dressed in business casual attire suitable for a university faculty member. Clean white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRJrKhNbJkkmm-7oQ3RcVZCP7A81Pwx6Yrr_Iq7ZorjYtpvOVous7Su8g_oWoIrfzw9ufAe1CWfNLkQD7d0I0ZVCjh3DqpZOYsWvNVwDJ_RWzwU81Wp0Y6CjL79Mg0pMy6WRcKu2HR_TlpXtMOOv8kLDsqH1CafqrFee9DAkcMkHdmf8mLgbgWEuuFjsKgpMdsyvJfvofGMjT_CLYGZ3s26CfUZBISGNDnbZsgCyKNAkb8bqwa5PuCJ7-Mhn1W4Yzk1PNoCPmZ5II"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<div class="p-lg md:p-xl max-w-container-max mx-auto w-full flex-1 flex flex-col gap-xl">
+<!-- Page Header & Progress -->
+<div class="flex flex-col gap-lg">
+<div class="flex justify-between items-end">
+<div>
+<h1 class="font-h1 text-h1 text-on-surface mb-xs hidden md:block">Thesis Workflow</h1>
+<h1 class="font-h1-mobile text-h1-mobile text-on-surface mb-xs md:hidden">Thesis Workflow</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Manage and track student thesis progression.</p>
+</div>
+</div>
+<!-- Global Progress Tracker (Visual Anchor) -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md">Standard Pipeline</h3>
+<div class="flex items-center justify-between relative">
+<!-- Connecting Line -->
+<div class="absolute top-1/2 left-0 w-full h-[2px] bg-surface-variant -z-10 -translate-y-1/2"></div>
+<!-- Steps -->
+<div class="flex flex-col items-center gap-sm bg-surface-container-lowest px-sm">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md shadow-sm border-2 border-surface-container-lowest">1</div>
+<span class="font-label-sm text-label-sm text-primary font-bold">Submission</span>
+</div>
+<div class="flex flex-col items-center gap-sm bg-surface-container-lowest px-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-md border-2 border-surface-container-lowest">2</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Proposal</span>
+</div>
+<div class="flex flex-col items-center gap-sm bg-surface-container-lowest px-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-md border-2 border-surface-container-lowest">3</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Seminar</span>
+</div>
+<div class="flex flex-col items-center gap-sm bg-surface-container-lowest px-sm hidden sm:flex">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-md border-2 border-surface-container-lowest">4</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Thesis</span>
+</div>
+<div class="flex flex-col items-center gap-sm bg-surface-container-lowest px-sm hidden sm:flex">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-md border-2 border-surface-container-lowest">5</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Exam</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Active Submissions Grid -->
+<div>
+<div class="flex justify-between items-center mb-md">
+<h2 class="font-h3 text-h3 text-on-surface">Active Submissions</h2>
+<div class="flex gap-sm">
+<button class="px-md py-sm border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface bg-surface-container-lowest hover:bg-surface-container-low transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">filter_list</span> Filter
+                        </button>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-md">
+<!-- Submission Card 1: Under Review -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-primary-fixed text-primary font-label-sm text-label-sm mb-sm border border-primary-fixed-dim">Under Review</span>
+<h3 class="font-h3 text-h3 text-on-surface leading-tight mb-xs">Optimization of Neural Networks for Edge Devices</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Ahmad Rizan • 190411100023</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant font-label-md border border-outline-variant shrink-0">
+                                AR
+                            </div>
+</div>
+<div class="grid grid-cols-2 gap-md mb-lg bg-surface-container-low p-md rounded-lg border border-outline-variant/50">
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Current Stage</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Proposal Defense</p>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Submitted</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Oct 12, 2023</p>
+</div>
+</div>
+<div class="flex gap-sm justify-end border-t border-outline-variant pt-md mt-auto">
+<button class="px-md py-sm border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-low transition-colors">Details</button>
+<button class="px-md py-sm bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:bg-primary-container transition-colors">Review Docs</button>
+</div>
+</div>
+<!-- Submission Card 2: Approved -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-status-success"></div>
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-status-success-bg text-status-success font-label-sm text-label-sm mb-sm border border-status-success/20">Approved</span>
+<h3 class="font-h3 text-h3 text-on-surface leading-tight mb-xs">Blockchain-based Supply Chain Integrity</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Siti Aminah • 190411100155</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant font-label-md border border-outline-variant shrink-0">
+                                SA
+                            </div>
+</div>
+<div class="grid grid-cols-2 gap-md mb-lg bg-surface-container-low p-md rounded-lg border border-outline-variant/50">
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Current Stage</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Seminar Prep</p>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Approved On</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Oct 10, 2023</p>
+</div>
+</div>
+<div class="flex gap-sm justify-end border-t border-outline-variant pt-md mt-auto">
+<button class="px-md py-sm border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-low transition-colors w-full sm:w-auto">Schedule Seminar</button>
+</div>
+</div>
+<!-- Submission Card 3: Draft -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-outline"></div>
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm mb-sm border border-outline-variant">Draft</span>
+<h3 class="font-h3 text-h3 text-on-surface leading-tight mb-xs">Predictive Maintenance using IoT Sensors</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Budi Santoso • 200411100088</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant font-label-md border border-outline-variant shrink-0">
+                                BS
+                            </div>
+</div>
+<div class="grid grid-cols-2 gap-md mb-lg bg-surface-container-low p-md rounded-lg border border-outline-variant/50 opacity-70">
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Current Stage</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Initial Submission</p>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Last Edited</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">2 hours ago</p>
+</div>
+</div>
+<div class="flex gap-sm justify-end border-t border-outline-variant pt-md mt-auto">
+<button class="px-md py-sm border border-outline-variant rounded-lg font-label-md text-label-md text-primary hover:bg-primary-fixed transition-colors">Continue Draft</button>
+</div>
+</div>
+<!-- Submission Card 4: Action Required -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-status-warning"></div>
+<div class="flex justify-between items-start mb-md">
+<div>
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-status-warning-bg text-status-warning font-label-sm text-label-sm mb-sm border border-status-warning/20">Revision Required</span>
+<h3 class="font-h3 text-h3 text-on-surface leading-tight mb-xs">Sentiment Analysis of Regional Elections</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Dewi Lestari • 190411100210</p>
+</div>
+<div class="h-10 w-10 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant font-label-md border border-outline-variant shrink-0">
+                                DL
+                            </div>
+</div>
+<div class="grid grid-cols-2 gap-md mb-lg bg-surface-container-low p-md rounded-lg border border-outline-variant/50">
+<div>
+<p class="font-label-sm text-label-sm text-outline mb-xs">Current Stage</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Proposal Defense</p>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-error mb-xs font-medium">Due Date</p>
+<p class="font-body-sm text-body-sm text-on-surface font-medium">Oct 15, 2023</p>
+</div>
+</div>
+<div class="flex gap-sm justify-end border-t border-outline-variant pt-md mt-auto">
+<button class="px-md py-sm border border-outline-variant rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-container-low transition-colors">View Feedback</button>
+<button class="px-md py-sm bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:bg-primary-container transition-colors">Submit Revision</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Empty State Example (Hidden by default, shown for layout purposes) -->
+<div class="mt-xl hidden">
+<div class="bg-surface-container-lowest border border-outline-variant border-dashed rounded-xl p-3xl flex flex-col items-center justify-center text-center">
+<div class="w-16 h-16 bg-surface-container-low rounded-full flex items-center justify-center mb-md text-outline">
+<span class="material-symbols-outlined text-[32px]">post_add</span>
+</div>
+<h3 class="font-h2 text-h2 text-on-surface mb-xs">No Submissions Yet</h3>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-md mb-lg">You haven't submitted any thesis documents yet. Start the process by creating your initial submission.</p>
+<button class="px-lg py-md bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:bg-primary-container transition-colors flex items-center gap-sm shadow-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                        Start New Submission
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

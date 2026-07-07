@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import {
@@ -412,35 +413,6 @@ export default function MasterDataPage() {
       ) : null}
 
       <section className="list-card master-list-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>
-              {activeTab === "peminatan" ? "Daftar Peminatan" : "Daftar Ruang"}
-            </h2>
-            <p className="muted">
-              {activeTab === "peminatan"
-                ? "List peminatan yang tersedia untuk mahasiswa."
-                : "List ruang untuk peminjaman dan penjadwalan sidang."}
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={
-                activeTab === "peminatan" ? "Cari peminatan..." : "Cari ruang..."
-              }
-            />
-
-            {canManageActiveTab ? (
-              <button type="button" className="primary-button" onClick={openCreateForm}>
-                {activeTab === "peminatan" ? "Tambah Peminatan" : "Tambah Ruang"}
-              </button>
-            ) : null}
-          </div>
-        </div>
-
         {isLoading ? (
           <div className="empty-state">
             <div>
@@ -452,6 +424,22 @@ export default function MasterDataPage() {
           <DataTable
             data={peminatanRows}
             emptyMessage="Belum ada data peminatan"
+            toolbar={
+              <FilterToolbar
+                title="Daftar Peminatan"
+                description="List peminatan yang tersedia untuk mahasiswa."
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Cari peminatan..."
+                action={
+                  canManageActiveTab ? (
+                    <button type="button" className="primary-button" onClick={openCreateForm}>
+                      Tambah Peminatan
+                    </button>
+                  ) : null
+                }
+              />
+            }
             columns={[
               {
                 key: "no",
@@ -539,6 +527,22 @@ export default function MasterDataPage() {
           <DataTable
             data={ruangRows}
             emptyMessage="Belum ada data ruang"
+            toolbar={
+              <FilterToolbar
+                title="Daftar Ruang"
+                description="List ruang untuk peminjaman dan penjadwalan sidang."
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Cari ruang..."
+                action={
+                  canManageActiveTab ? (
+                    <button type="button" className="primary-button" onClick={openCreateForm}>
+                      Tambah Ruang
+                    </button>
+                  ) : null
+                }
+              />
+            }
             columns={[
               {
                 key: "no",

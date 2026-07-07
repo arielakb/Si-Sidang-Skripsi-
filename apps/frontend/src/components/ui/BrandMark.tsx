@@ -5,11 +5,9 @@ type BrandMarkProps = {
 export default function BrandMark({ compact = false }: BrandMarkProps) {
   return (
     <div className="brand-panel">
-      <img
-        src="/logo-up.png"
-        alt="Logo Universitas Pancasila"
-        className="brand-logo"
-      />
+      <div className="brand-icon-wrap">
+        <span className="material-symbols-outlined">school</span>
+      </div>
 
       {!compact ? (
         <div className="brand-copy">

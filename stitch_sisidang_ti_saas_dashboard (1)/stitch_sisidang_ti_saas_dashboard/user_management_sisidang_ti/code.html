@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>User Management - Sisidang TI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#9fbfff",
+                        "surface-dim": "#d8dadc",
+                        "primary-fixed-dim": "#acc7ff",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e0e3e5",
+                        "on-primary-fixed-variant": "#004591",
+                        "surface-container-highest": "#e0e3e5",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-secondary-container": "#735800",
+                        "secondary-fixed-dim": "#f0c03e",
+                        "tertiary-fixed": "#dae2fd",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed": "#131b2e",
+                        "on-secondary-fixed": "#251a00",
+                        "surface-tint": "#265dad",
+                        "on-secondary-fixed-variant": "#594400",
+                        "outline-variant": "#c3c6d3",
+                        "secondary-container": "#ffce4b",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#454d62",
+                        "on-surface": "#191c1e",
+                        "surface-container-high": "#e6e8ea",
+                        "outline": "#737783",
+                        "inverse-surface": "#2d3133",
+                        "on-tertiary-fixed-variant": "#3f465c",
+                        "primary-fixed": "#d7e2ff",
+                        "surface-container-low": "#f2f4f6",
+                        "on-tertiary-container": "#b6bed8",
+                        "inverse-primary": "#acc7ff",
+                        "primary-container": "#064b9b",
+                        "error-container": "#ffdad6",
+                        "on-background": "#191c1e",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "secondary": "#765a00",
+                        "tertiary": "#2e364b",
+                        "on-primary-fixed": "#001a40",
+                        "surface-bright": "#f7f9fb",
+                        "on-surface-variant": "#424751",
+                        "background": "#f7f9fb",
+                        "primary": "#003572",
+                        "surface": "#f7f9fb",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#ffdf95",
+                        "tertiary-fixed-dim": "#bec6e0",
+                        "surface-container": "#eceef0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "3xl": "64px",
+                        "base": "8px",
+                        "md": "16px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "gutter": "24px",
+                        "xl": "32px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "h1-mobile": ["Inter"],
+                        "h3": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h2": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "h1": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h1-mobile": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "h1": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="w-64 h-full fixed left-0 top-0 hidden md:flex flex-col border-r border-outline-variant bg-surface-container-lowest z-50">
+<div class="py-lg px-md">
+<div class="mb-xl flex items-center gap-md">
+<div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center font-h3">
+                    STI
+                </div>
+<div>
+<h1 class="font-h3 text-h3 font-bold text-primary">Sisidang TI</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Thesis Management System</p>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md py-md px-md rounded-lg hover:bg-primary-container hover:shadow-sm transition-all mb-xl flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                New Thesis Submission
+            </button>
+<ul class="flex flex-col gap-base flex-1">
+<li class="group">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li class="group">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">description</span>
+<span class="font-label-md text-label-md">Thesis Management</span>
+</a>
+</li>
+<li class="group">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">calendar_today</span>
+<span class="font-label-md text-label-md">Schedule</span>
+</a>
+</li>
+<li class="group">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-primary font-bold border-r-4 border-primary bg-surface-container-low cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-label-md text-label-md">Users</span>
+</a>
+</li>
+<li class="group mt-auto">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</li>
+<li class="group">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined group-hover:text-primary transition-colors">help</span>
+<span class="font-label-md text-label-md">Help</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="p-md border-t border-outline-variant mt-auto">
+<a class="flex items-center gap-md px-md py-sm rounded-md text-on-surface-variant hover:text-error hover:bg-error-container transition-colors cursor-pointer active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 ml-0 md:ml-64 flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed full-width top-0 z-40 bg-surface-container-lowest border-b border-outline-variant shadow-sm w-full md:w-[calc(100%-256px)] h-16 flex justify-between items-center px-lg py-md">
+<div class="flex-1 flex items-center">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full focus:ring-2 focus:ring-primary font-body-sm text-body-sm text-on-surface outline-none placeholder:text-on-surface-variant" placeholder="Search users..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-all rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-all rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined">apps</span>
+</button>
+<div class="h-8 w-px bg-outline-variant mx-sm"></div>
+<div class="flex items-center gap-sm cursor-pointer group">
+<div class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-label-sm">
+                        AD
+                    </div>
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors hidden sm:block">Admin User</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-[20px]">arrow_drop_down</span>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 p-lg md:p-xl mt-16 max-w-container-max mx-auto w-full">
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-md mb-xl">
+<div>
+<h2 class="font-h2 text-h2 font-bold text-on-surface tracking-tight">User Management</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-sm">Manage students, faculty, and administrative staff accounts.</p>
+</div>
+<button class="bg-primary text-on-primary font-label-md text-label-md py-2 px-md rounded-lg hover:bg-primary-container hover:shadow-sm transition-all flex items-center gap-sm whitespace-nowrap" id="addUserBtn">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person_add</span>
+                    Add User
+                </button>
+</div>
+<!-- Table Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<!-- Filters/Tabs -->
+<div class="border-b border-outline-variant px-lg py-sm flex gap-md overflow-x-auto hide-scrollbar">
+<button class="font-label-md text-label-md px-md py-2 text-primary border-b-2 border-primary whitespace-nowrap">All Users</button>
+<button class="font-label-md text-label-md px-md py-2 text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-colors">Students</button>
+<button class="font-label-md text-label-md px-md py-2 text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-colors">Faculty</button>
+<button class="font-label-md text-label-md px-md py-2 text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-colors">Admins</button>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[800px]">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="font-label-sm text-label-sm text-on-surface-variant py-md px-lg w-12 text-center">
+<input class="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer" type="checkbox"/>
+</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider py-md px-lg">Name</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider py-md px-lg">ID (NIM/NIDN)</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider py-md px-lg">Role</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider py-md px-lg">Status</th>
+<th class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider py-md px-lg text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-bright transition-colors group cursor-default">
+<td class="py-md px-lg text-center">
+<input class="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" type="checkbox"/>
+</td>
+<td class="py-md px-lg">
+<div class="flex items-center gap-md">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-sm shrink-0">
+                                            AR
+                                        </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">Ahmad Rizal</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">ahmad.rizal@univ.edu</div>
+</div>
+</div>
+</td>
+<td class="py-md px-lg font-body-sm text-body-sm text-on-surface">123456789</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-tertiary-fixed text-on-tertiary-fixed">Student</span>
+</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-primary-fixed text-on-primary-fixed">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                        Active
+                                    </span>
+</td>
+<td class="py-md px-lg text-right">
+<div class="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-error-container rounded transition-colors" title="Delete">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-bright transition-colors group cursor-default">
+<td class="py-md px-lg text-center">
+<input class="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" type="checkbox"/>
+</td>
+<td class="py-md px-lg">
+<div class="flex items-center gap-md">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-sm shrink-0">
+                                            DR
+                                        </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold">Dr. Budi Santoso</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">budi.s@univ.edu</div>
+</div>
+</div>
+</td>
+<td class="py-md px-lg font-body-sm text-body-sm text-on-surface">987654321</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary-fixed text-on-secondary-fixed">Faculty</span>
+</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-primary-fixed text-on-primary-fixed">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                        Active
+                                    </span>
+</td>
+<td class="py-md px-lg text-right">
+<div class="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-error-container rounded transition-colors" title="Delete">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-bright transition-colors group cursor-default">
+<td class="py-md px-lg text-center">
+<input class="rounded border-outline-variant text-primary focus:ring-primary h-4 w-4 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" type="checkbox"/>
+</td>
+<td class="py-md px-lg">
+<div class="flex items-center gap-md">
+<div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-sm shrink-0">
+                                            SN
+                                        </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface font-semibold text-opacity-60">Siti Nurhaliza</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">siti.n@univ.edu</div>
+</div>
+</div>
+</td>
+<td class="py-md px-lg font-body-sm text-body-sm text-on-surface text-opacity-60">112233445</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-tertiary-fixed text-on-tertiary-fixed opacity-60">Student</span>
+</td>
+<td class="py-md px-lg">
+<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-surface-variant text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                                        Inactive
+                                    </span>
+</td>
+<td class="py-md px-lg text-right">
+<div class="flex items-center justify-end gap-sm opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded transition-colors" title="Activate">
+<span class="material-symbols-outlined text-[20px]">power_settings_new</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded transition-colors" title="Edit">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-error hover:bg-error-container rounded transition-colors" title="Delete">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="border-t border-outline-variant px-lg py-md flex items-center justify-between bg-surface-container-lowest">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Showing 1 to 3 of 124 results</span>
+<div class="flex items-center gap-sm">
+<button class="p-1 text-on-surface-variant hover:bg-surface-container-high rounded disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded bg-primary text-on-primary font-label-sm flex items-center justify-center">1</button>
+<button class="w-8 h-8 rounded hover:bg-surface-container-high text-on-surface font-label-sm flex items-center justify-center transition-colors">2</button>
+<button class="w-8 h-8 rounded hover:bg-surface-container-high text-on-surface font-label-sm flex items-center justify-center transition-colors">3</button>
+<button class="p-1 text-on-surface-variant hover:bg-surface-container-high rounded">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Side Drawer (Hidden by default) -->
+<div class="fixed inset-0 bg-on-surface/20 backdrop-blur-sm z-50 opacity-0 pointer-events-none transition-opacity duration-300" id="drawerOverlay"></div>
+<div class="fixed top-0 right-0 h-full w-full max-w-md bg-surface-container-lowest shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out border-l border-outline-variant flex flex-col" id="sideDrawer">
+<!-- Drawer Header -->
+<div class="px-lg py-md border-b border-outline-variant flex items-center justify-between bg-surface-container-lowest shrink-0">
+<h3 class="font-h3 text-h3 font-semibold text-on-surface">Add New User</h3>
+<button class="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-full transition-colors" id="closeDrawerBtn">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Drawer Body (Scrollable) -->
+<div class="p-lg flex-1 overflow-y-auto">
+<form class="flex flex-col gap-lg">
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface-variant">Full Name</label>
+<input class="px-md py-2 bg-surface border border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-shadow" placeholder="e.g. Ahmad Rizal" type="text"/>
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface-variant">Email Address</label>
+<input class="px-md py-2 bg-surface border border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-shadow" placeholder="e.g. user@univ.edu" type="email"/>
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface-variant">ID (NIM/NIDN)</label>
+<input class="px-md py-2 bg-surface border border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface transition-shadow" placeholder="Enter identification number" type="text"/>
+</div>
+<div class="flex flex-col gap-xs">
+<label class="font-label-md text-label-md text-on-surface-variant">Role</label>
+<div class="relative">
+<select class="w-full px-md py-2 bg-surface border border-outline-variant rounded-md focus:border-primary focus:ring-1 focus:ring-primary outline-none font-body-md text-body-md text-on-surface appearance-none transition-shadow">
+<option>Student</option>
+<option>Faculty / Advisor</option>
+<option>Administrator</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+<div class="flex flex-col gap-xs mt-md">
+<label class="font-label-md text-label-md text-on-surface-variant mb-sm">Account Status</label>
+<label class="flex items-center gap-md cursor-pointer">
+<div class="relative">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</div>
+<span class="font-body-md text-body-md text-on-surface">Active</span>
+</label>
+</div>
+</form>
+</div>
+<!-- Drawer Footer -->
+<div class="p-lg border-t border-outline-variant bg-surface-container-lowest shrink-0 flex gap-md justify-end">
+<button class="px-md py-2 border border-outline text-on-surface font-label-md text-label-md rounded-md hover:bg-surface-container-low transition-colors" id="cancelDrawerBtn">
+                Cancel
+            </button>
+<button class="px-md py-2 bg-primary text-on-primary font-label-md text-label-md rounded-md hover:bg-primary-container hover:shadow-sm transition-all">
+                Save User
+            </button>
+</div>
+</div>
+<script>
+        // Drawer toggle logic
+        const drawer = document.getElementById('sideDrawer');
+        const overlay = document.getElementById('drawerOverlay');
+        const addBtn = document.getElementById('addUserBtn');
+        const closeBtn = document.getElementById('closeDrawerBtn');
+        const cancelBtn = document.getElementById('cancelDrawerBtn');
+
+        function openDrawer() {
+            drawer.classList.remove('translate-x-full');
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+            overlay.classList.add('opacity-100');
+        }
+
+        function closeDrawer() {
+            drawer.classList.add('translate-x-full');
+            overlay.classList.remove('opacity-100');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        addBtn.addEventListener('click', openDrawer);
+        closeBtn.addEventListener('click', closeDrawer);
+        cancelBtn.addEventListener('click', closeDrawer);
+        overlay.addEventListener('click', closeDrawer);
+    </script>
+</body></html>

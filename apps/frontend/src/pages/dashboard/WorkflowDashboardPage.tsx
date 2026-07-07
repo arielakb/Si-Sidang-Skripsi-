@@ -281,7 +281,7 @@ export default function WorkflowDashboardPage() {
         }
       />
 
-      <div className="workflow-metric-grid">
+      <div className="metric-grid">
         {metrics.map((metric) => (
           <MetricCard
             key={metric.label}

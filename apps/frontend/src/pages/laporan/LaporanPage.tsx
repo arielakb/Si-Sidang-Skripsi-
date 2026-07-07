@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
 import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import MetricCard from "../../components/ui/MetricCard";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -233,215 +234,201 @@ export default function LaporanPage() {
       ) : null}
 
       <section className="list-card laporan-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Data Skripsi</h2>
-            <p className="muted">
-              Total: {meta?.total ?? 0} data • Halaman {meta?.page ?? 1}/
-              {meta?.totalPages ?? 1}
-            </p>
-          </div>
+        <DataTable
+          data={rows}
+          isLoading={laporanQuery.isLoading}
+          emptyMessage="Belum ada data sesuai filter"
+          toolbar={
+            <FilterToolbar
+              title="Data Skripsi"
+              description={`Total: ${meta?.total ?? 0} data • Halaman ${meta?.page ?? 1}/${meta?.totalPages ?? 1}`}
+              searchValue={filters.search ?? ""}
+              onSearchChange={(val) => updateFilter("search", val)}
+              searchPlaceholder="Cari nama, NPM, atau judul..."
+              action={
+                <div className="row-inline">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleExportExcel}
+                    disabled={Boolean(isExporting)}
+                  >
+                    {isExporting === "excel" ? "Exporting..." : "Export Excel"}
+                  </button>
 
-          <div className="master-toolbar-actions">
-            <input
-              value={filters.search ?? ""}
-              onChange={(event) => updateFilter("search", event.target.value)}
-              placeholder="Cari nama, NPM, atau judul..."
-            />
-
-            <select
-              value={filters.status ?? ""}
-              onChange={(event) => updateFilter("status", event.target.value)}
-            >
-              <option value="">Semua Status</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.tahap ?? ""}
-              onChange={(event) => updateFilter("tahap", event.target.value)}
-            >
-              <option value="">Semua Tahap</option>
-              {tahapOptions.map((tahap) => (
-                <option key={tahap} value={tahap}>
-                  {tahap}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.peminatanId ?? ""}
-              onChange={(event) =>
-                updateFilter("peminatanId", event.target.value)
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleExportPdf}
+                    disabled={Boolean(isExporting)}
+                  >
+                    {isExporting === "pdf" ? "Exporting..." : "Export PDF"}
+                  </button>
+                </div>
               }
             >
-              <option value="">Semua Peminatan</option>
-              {(peminatanQuery.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+              <div className="filter-field">
+                <label>Status</label>
+                <select
+                  value={filters.status ?? ""}
+                  onChange={(event) => updateFilter("status", event.target.value)}
+                >
+                  <option value="">Semua Status</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <input
-              type="date"
-              value={filters.startDate ?? ""}
-              onChange={(event) => updateFilter("startDate", event.target.value)}
-              title="Start Date"
-            />
+              <div className="filter-field">
+                <label>Tahap</label>
+                <select
+                  value={filters.tahap ?? ""}
+                  onChange={(event) => updateFilter("tahap", event.target.value)}
+                >
+                  <option value="">Semua Tahap</option>
+                  {tahapOptions.map((tahap) => (
+                    <option key={tahap} value={tahap}>
+                      {tahap}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <input
-              type="date"
-              value={filters.endDate ?? ""}
-              onChange={(event) => updateFilter("endDate", event.target.value)}
-              title="End Date"
-            />
+              <div className="filter-field">
+                <label>Peminatan</label>
+                <select
+                  value={filters.peminatanId ?? ""}
+                  onChange={(event) =>
+                    updateFilter("peminatanId", event.target.value)
+                  }
+                >
+                  <option value="">Semua Peminatan</option>
+                  {(peminatanQuery.data ?? []).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleExportExcel}
-              disabled={Boolean(isExporting)}
-            >
-              {isExporting === "excel" ? "Exporting..." : "Export Excel"}
-            </button>
+              <div className="filter-field">
+                <label>Start Date</label>
+                <input
+                  type="date"
+                  value={filters.startDate ?? ""}
+                  onChange={(event) => updateFilter("startDate", event.target.value)}
+                  title="Start Date"
+                />
+              </div>
 
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleExportPdf}
-              disabled={Boolean(isExporting)}
-            >
-              {isExporting === "pdf" ? "Exporting..." : "Export PDF"}
-            </button>
-          </div>
-        </div>
-
-        {laporanQuery.isLoading ? (
-          <EmptyState
-            title="Memuat laporan..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : (
-          <DataTable
-            data={rows}
-            emptyMessage="Belum ada data sesuai filter"
-            columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (item) => item.no
-              },
-              {
-                key: "mahasiswa",
-                header: "Mahasiswa",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.mahasiswa}</strong>
-                    <span>
-                      {item.npm} • {item.email || "-"}
-                    </span>
-                  </div>
-                )
-              },
-              {
-                key: "judul",
-                header: "Judul",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.judul || "Tanpa judul"}</strong>
-                    <span>{item.peminatan || "-"}</span>
-                  </div>
-                )
-              },
-              {
-                key: "tahap",
-                header: "Tahap",
-                align: "center",
-                render: (item) => <StatusBadge value={item.tahap} size="sm" />
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (item) => <StatusBadge value={item.status} size="sm" />
-              },
-              {
-                key: "pembimbing",
-                header: "Pembimbing",
-                render: (item) => item.pembimbing || "-"
-              },
-              {
-                key: "bimbingan",
-                header: "Bimbingan",
-                align: "center",
-                render: (item) => (
-                  <div className="table-title-cell table-center-cell">
-                    <strong>{item.bimbinganValid}/8</strong>
-                    <span>{item.progress}%</span>
-                  </div>
-                )
-              },
-              {
-                key: "nilai",
-                header: "Nilai",
-                align: "center",
-                render: (item) => (
-                  <div className="score-box table-score-box">
-                    <strong>{item.nilaiAkhir || "-"}</strong>
-                    <small>{item.nilaiHuruf || "-"}</small>
-                  </div>
-                )
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (item) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => openDetailDrawer(item)}
-                    >
-                      Detail
-                    </button>
-                  </div>
-                )
-              }
-            ]}
-          />
-        )}
-
-        <div className="pagination-row">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={(filters.page ?? 1) <= 1}
-            onClick={() => updateFilter("page", Math.max((filters.page ?? 1) - 1, 1))}
-          >
-            Sebelumnya
-          </button>
-
-          <span>
-            Halaman {meta?.page ?? filters.page ?? 1} dari{" "}
-            {meta?.totalPages ?? 1}
-          </span>
-
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={(meta?.page ?? 1) >= (meta?.totalPages ?? 1)}
-            onClick={() => updateFilter("page", (filters.page ?? 1) + 1)}
-          >
-            Berikutnya
-          </button>
-        </div>
+              <div className="filter-field">
+                <label>End Date</label>
+                <input
+                  type="date"
+                  value={filters.endDate ?? ""}
+                  onChange={(event) => updateFilter("endDate", event.target.value)}
+                  title="End Date"
+                />
+              </div>
+            </FilterToolbar>
+          }
+          pagination={{
+            page: filters.page ?? 1,
+            pageSize: filters.limit ?? 20,
+            totalItems: meta?.total ?? 0,
+            totalPages: meta?.totalPages ?? 1,
+            onPageChange: (page) => updateFilter("page", page),
+            itemLabel: "skripsi"
+          }}
+          columns={[
+            {
+              key: "no",
+              header: "No",
+              align: "center",
+              render: (item) => item.no
+            },
+            {
+              key: "mahasiswa",
+              header: "Mahasiswa",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{item.mahasiswa}</strong>
+                  <span>
+                    {item.npm} • {item.email || "-"}
+                  </span>
+                </div>
+              )
+            },
+            {
+              key: "judul",
+              header: "Judul",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{item.judul || "Tanpa judul"}</strong>
+                  <span>{item.peminatan || "-"}</span>
+                </div>
+              )
+            },
+            {
+              key: "tahap",
+              header: "Tahap",
+              align: "center",
+              render: (item) => <StatusBadge value={item.tahap} size="sm" />
+            },
+            {
+              key: "status",
+              header: "Status",
+              align: "center",
+              render: (item) => <StatusBadge value={item.status} size="sm" />
+            },
+            {
+              key: "pembimbing",
+              header: "Pembimbing",
+              render: (item) => item.pembimbing || "-"
+            },
+            {
+              key: "bimbingan",
+              header: "Bimbingan",
+              align: "center",
+              render: (item) => (
+                <div className="table-title-cell table-center-cell">
+                  <strong>{item.bimbinganValid}/8</strong>
+                  <span>{item.progress}%</span>
+                </div>
+              )
+            },
+            {
+              key: "nilai",
+              header: "Nilai",
+              align: "center",
+              render: (item) => (
+                <div className="score-box table-score-box">
+                  <strong>{item.nilaiAkhir || "-"}</strong>
+                  <small>{item.nilaiHuruf || "-"}</small>
+                </div>
+              )
+            },
+            {
+              key: "actions",
+              header: "Aksi",
+              align: "right",
+              render: (item) => (
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => openDetailDrawer(item)}
+                  >
+                    Detail
+                  </button>
+                </div>
+              )
+            }
+          ]}
+        />
       </section>
 
       {drawerMode === "detail" && selectedRow ? (
@@ -465,101 +452,57 @@ export default function LaporanPage() {
               </button>
             </div>
 
-            <div className="laporan-detail-stack">
-              <div className="skripsi-detail-title">
-                <strong>{selectedRow.judul || "Tanpa judul"}</strong>
-                <StatusBadge value={selectedRow.status} />
-              </div>
-
-              <div className="info-list">
-                <div className="info-row">
-                  <span>Mahasiswa</span>
-                  <strong>{selectedRow.mahasiswa}</strong>
+            <div className="page-stack">
+              <div className="workflow-history-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                <div>
+                  <p className="eyebrow" style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                    {selectedRow.npm || "-"}
+                  </p>
+                  <h2 style={{ fontSize: "24px", fontWeight: 700, marginBottom: "4px", color: "var(--on-surface)" }}>
+                    {selectedRow.mahasiswa || "-"}
+                  </h2>
+                  <p className="muted" style={{ color: "var(--on-surface-variant)", fontSize: "14px" }}>
+                    {selectedRow.judul || "Tanpa judul"}
+                  </p>
                 </div>
 
-                <div className="info-row">
-                  <span>NPM</span>
-                  <strong>{selectedRow.npm}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Email</span>
-                  <strong>{selectedRow.email || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Peminatan</span>
-                  <strong>{selectedRow.peminatan || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Jenis Skripsi</span>
-                  <strong>{selectedRow.jenisSkripsi || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Tahap</span>
-                  <strong>{selectedRow.tahap || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Status</span>
-                  <strong>{selectedRow.status || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Pembimbing</span>
-                  <p>{selectedRow.pembimbing || "-"}</p>
-                </div>
-
-                <div className="info-row">
-                  <span>Penguji</span>
-                  <p>{selectedRow.penguji || "-"}</p>
-                </div>
-
-                <div className="info-row">
-                  <span>Bimbingan Valid</span>
-                  <strong>{selectedRow.bimbinganValid}/8</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Jumlah Berkas</span>
-                  <strong>{selectedRow.jumlahBerkas}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Jumlah Revisi</span>
-                  <strong>{selectedRow.jumlahRevisi}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Nilai</span>
-                  <strong>
-                    {selectedRow.nilaiAkhir || "-"} /{" "}
-                    {selectedRow.nilaiHuruf || "-"}
-                  </strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Progress</span>
-                  <strong>{selectedRow.progress}%</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Jadwal Sidang</span>
-                  <strong>{selectedRow.jadwalSidang || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Ruang</span>
-                  <strong>{selectedRow.ruang || "-"}</strong>
-                </div>
-
-                <div className="info-row">
-                  <span>Dibuat</span>
-                  <strong>{formatDate(selectedRow.createdAt)}</strong>
+                <div className="workflow-final-status" style={{ textAlign: "right" }}>
+                  <StatusBadge value={selectedRow.status} size="md" />
+                  <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--on-surface-variant)", fontWeight: 600 }}>
+                    {selectedRow.jenisSkripsi || "Skripsi"}
+                  </div>
                 </div>
               </div>
+
+              <div className="workflow-progress-track" style={{ height: "4px", backgroundColor: "var(--surface-container-high)", borderRadius: "4px", overflow: "hidden", marginBottom: "24px" }}>
+                <span style={{ display: "block", height: "100%", width: `${selectedRow.progress || 0}%`, backgroundColor: "var(--primary)" }} />
+              </div>
+
+              <DataTable<any>
+                data={[
+                  { label: "Email", value: selectedRow.email || "-" },
+                  { label: "Peminatan", value: selectedRow.peminatan || "-" },
+                  { label: "Tahap", value: selectedRow.tahap || "-" },
+                  { label: "Status", value: selectedRow.status || "-" },
+                  { label: "Pembimbing", value: selectedRow.pembimbing || "-" },
+                  { label: "Penguji", value: selectedRow.penguji || "-" },
+                  { label: "Bimbingan Valid", value: `${selectedRow.bimbinganValid}/8` },
+                  { label: "Jumlah Berkas", value: selectedRow.jumlahBerkas },
+                  { label: "Jumlah Revisi", value: selectedRow.jumlahRevisi },
+                  { label: "Nilai", value: `${selectedRow.nilaiAkhir || "-"} / ${selectedRow.nilaiHuruf || "-"}` },
+                  { label: "Progress", value: `${selectedRow.progress}%` },
+                  { label: "Jadwal Sidang", value: selectedRow.jadwalSidang || "-" },
+                  { label: "Ruang", value: selectedRow.ruang || "-" },
+                  { label: "Dibuat", value: formatDate(selectedRow.createdAt) }
+                ]}
+                columns={[
+                  { key: "label", header: "Informasi", width: "40%", render: (item) => <strong>{item.label}</strong> },
+                  { key: "value", header: "Detail", render: (item) => item.value }
+                ]}
+                compact
+                emptyMessage="Tidak ada data."
+                getRowKey={(item) => item.label}
+              />
             </div>
           </aside>
         </div>

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import FileDownloadButton from "../../components/FileDownloadButton";
 import DataTable from "../../components/ui/DataTable";
 import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { getPeminatan } from "../../services/masterData";
@@ -506,37 +507,6 @@ export default function SkripsiPage() {
       ) : null}
 
       <section className="list-card skripsi-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Daftar Skripsi</h2>
-            <p className="muted">
-              List skripsi dan seminar proposal mahasiswa dalam bentuk table.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari judul, status, atau peminatan..."
-            />
-
-            <button
-              type="button"
-              className="primary-button"
-              onClick={openCreateDrawer}
-              disabled={hasActiveSkripsi}
-              title={
-                hasActiveSkripsi
-                  ? "Selesaikan skripsi aktif sebelum membuat pendaftaran baru."
-                  : "Daftar seminar proposal"
-              }
-            >
-              Daftar Seminar Proposal
-            </button>
-          </div>
-        </div>
-
         {hasActiveSkripsi ? (
           <div className="state-card skripsi-info-card">
             Anda sudah memiliki proses skripsi aktif. Tombol daftar seminar
@@ -544,16 +514,35 @@ export default function SkripsiPage() {
           </div>
         ) : null}
 
-        {seminarQuery.isLoading ? (
-          <EmptyState
-            title="Memuat data skripsi..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : (
-          <DataTable
-            data={filteredSkripsiList}
-            emptyMessage="Belum ada data skripsi"
-            columns={[
+        <DataTable
+          data={filteredSkripsiList}
+          isLoading={seminarQuery.isLoading}
+          emptyMessage="Belum ada data skripsi"
+          toolbar={
+            <FilterToolbar
+              title="Daftar Skripsi"
+              description="List skripsi dan seminar proposal mahasiswa dalam bentuk table."
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari judul, status, atau peminatan..."
+              action={
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={openCreateDrawer}
+                  disabled={hasActiveSkripsi}
+                  title={
+                    hasActiveSkripsi
+                      ? "Selesaikan skripsi aktif sebelum membuat pendaftaran baru."
+                      : "Daftar seminar proposal"
+                  }
+                >
+                  Daftar Seminar Proposal
+                </button>
+              }
+            />
+          }
+          columns={[
               {
                 key: "no",
                 header: "No",
@@ -651,7 +640,6 @@ export default function SkripsiPage() {
               }
             ]}
           />
-        )}
       </section>
 
       {drawerMode ? (

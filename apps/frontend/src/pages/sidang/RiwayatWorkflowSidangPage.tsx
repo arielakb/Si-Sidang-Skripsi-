@@ -7,6 +7,7 @@ import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import SectionCard from "../../components/ui/SectionCard";
 import StatusBadge from "../../components/ui/StatusBadge";
+import MetricCard from "../../components/ui/MetricCard";
 import { getSidangList, type SidangItem } from "../../services/sidang";
 
 const workflowOrder = [
@@ -303,30 +304,30 @@ export default function RiwayatWorkflowSidangPage() {
         description="Pantau perjalanan mahasiswa dari Seminar Proposal, Seminar Hasil, Sidang Kompre, hingga Sidang Akhir."
       />
 
-      <div className="workflow-metric-grid">
-        <article className="workflow-metric-card">
-          <span>Total Riwayat</span>
-          <strong>{metrics.total}</strong>
-          <p>Skripsi dalam riwayat workflow</p>
-        </article>
+      <div className="metric-grid">
+        <MetricCard
+          label="Total Riwayat"
+          value={metrics.total}
+          description="Skripsi dalam riwayat workflow"
+        />
 
-        <article className="workflow-metric-card">
-          <span>Masih Berjalan</span>
-          <strong>{metrics.berjalan}</strong>
-          <p>Belum punya keputusan akhir</p>
-        </article>
+        <MetricCard
+          label="Masih Berjalan"
+          value={metrics.berjalan}
+          description="Belum punya keputusan akhir"
+        />
 
-        <article className="workflow-metric-card">
-          <span>Lulus</span>
-          <strong>{metrics.lulus}</strong>
-          <p>Keputusan akhir LULUS</p>
-        </article>
+        <MetricCard
+          label="Lulus"
+          value={metrics.lulus}
+          description="Keputusan akhir LULUS"
+        />
 
-        <article className="workflow-metric-card">
-          <span>Tidak Lulus</span>
-          <strong>{metrics.tidakLulus}</strong>
-          <p>Keputusan akhir TIDAK_LULUS</p>
-        </article>
+        <MetricCard
+          label="Tidak Lulus"
+          value={metrics.tidakLulus}
+          description="Keputusan akhir TIDAK_LULUS"
+        />
       </div>
 
       <SectionCard

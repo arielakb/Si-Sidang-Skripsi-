@@ -12,9 +12,9 @@ type WorkflowStepperProps = {
 };
 
 function getStepSymbol(status: WorkflowStepStatus) {
-  if (status === "done") return "✓";
-  if (status === "active") return "●";
-  if (status === "danger") return "!";
+  if (status === "done") return "check";
+  if (status === "active") return "radio_button_checked";
+  if (status === "danger") return "error";
   return "";
 }
 
@@ -26,8 +26,14 @@ export default function WorkflowStepper({ steps }: WorkflowStepperProps) {
           key={step.key}
           className={`workflow-step workflow-step-${step.status}`}
         >
-          <div className="workflow-step-index">
-            {getStepSymbol(step.status) || index + 1}
+          <div className="workflow-step-icon">
+            {getStepSymbol(step.status) ? (
+              <span className="material-symbols-outlined">
+                {getStepSymbol(step.status)}
+              </span>
+            ) : (
+              <span>{index + 1}</span>
+            )}
           </div>
 
           <div>

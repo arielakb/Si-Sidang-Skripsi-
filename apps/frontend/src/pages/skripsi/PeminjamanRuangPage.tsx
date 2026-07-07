@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
 import DataTable from "../../components/ui/DataTable";
 import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { getRuang } from "../../services/masterData";
@@ -423,55 +424,46 @@ export default function PeminjamanRuangPage() {
       ) : null}
 
       <section className="list-card peminjaman-table-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>{canApprove ? "Semua Peminjaman" : "Peminjaman Saya"}</h2>
-            <p className="muted">
-              List peminjaman ruang, jadwal penggunaan, keperluan, dan status approval.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari ruang, peminjam, keperluan..."
-            />
-
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+        <DataTable
+          data={filteredRows}
+          isLoading={isLoading}
+          emptyMessage="Belum ada data peminjaman ruang"
+          toolbar={
+            <FilterToolbar
+              title={canApprove ? "Semua Peminjaman" : "Peminjaman Saya"}
+              description="List peminjaman ruang, jadwal penggunaan, keperluan, dan status approval."
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari ruang, peminjam, keperluan..."
+              action={
+                canBorrow ? (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={openCreateDrawer}
+                  >
+                    Ajukan Peminjaman
+                  </button>
+                ) : null
+              }
             >
-              <option value="">Semua Status</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-
-            {canBorrow ? (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={openCreateDrawer}
-              >
-                Ajukan Peminjaman
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {isLoading ? (
-          <EmptyState
-            title="Memuat peminjaman ruang..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : (
-          <DataTable
-            data={filteredRows}
-            emptyMessage="Belum ada data peminjaman ruang"
-            columns={[
+              <div className="filter-field">
+                <label>Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="">Semua Status</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </FilterToolbar>
+          }
+          columns={[
               {
                 key: "no",
                 header: "No",
@@ -566,7 +558,7 @@ export default function PeminjamanRuangPage() {
               }
             ]}
           />
-        )}
+
       </section>
 
       {drawerMode ? (
@@ -672,60 +664,50 @@ export default function PeminjamanRuangPage() {
                 </button>
               </form>
             ) : selectedPeminjaman ? (
-              <div className="peminjaman-detail-stack">
-                <div className="skripsi-detail-title">
-                  <strong>{getRuangLabel(selectedPeminjaman)}</strong>
-                  <StatusBadge value={selectedPeminjaman.status} />
-                </div>
-
-                <div className="info-list">
-                  <div className="info-row">
-                    <span>Peminjam</span>
-                    <strong>{getPeminjamLabel(selectedPeminjaman)}</strong>
+              <div className="page-stack">
+                <div className="workflow-history-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                  <div>
+                    <p className="eyebrow" style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                      {selectedPeminjaman.mahasiswa?.identifier || "admin"}
+                    </p>
+                    <h2 style={{ fontSize: "24px", fontWeight: 700, marginBottom: "4px", color: "var(--on-surface)" }}>
+                      {getPeminjamLabel(selectedPeminjaman)}
+                    </h2>
+                    <p className="muted" style={{ color: "var(--on-surface-variant)", fontSize: "14px" }}>
+                      {getRuangLabel(selectedPeminjaman)}
+                    </p>
                   </div>
 
-                  <div className="info-row">
-                    <span>NPM / Identifier</span>
-                    <strong>
-                      {selectedPeminjaman.mahasiswa?.identifier || "-"}
-                    </strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Tanggal</span>
-                    <strong>{formatDateOnly(selectedPeminjaman.tanggal)}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Waktu Mulai</span>
-                    <strong>{formatDateTime(selectedPeminjaman.waktuMulai)}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Waktu Selesai</span>
-                    <strong>{formatDateTime(selectedPeminjaman.waktuSelesai)}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Keperluan</span>
-                    <p>{selectedPeminjaman.keperluan || "-"}</p>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Alasan / Catatan</span>
-                    <p>{selectedPeminjaman.alasan || "-"}</p>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Reviewer</span>
-                    <strong>{selectedPeminjaman.reviewedBy?.name || "-"}</strong>
-                  </div>
-
-                  <div className="info-row">
-                    <span>Reviewed At</span>
-                    <strong>{formatDateTime(selectedPeminjaman.reviewedAt)}</strong>
+                  <div className="workflow-final-status" style={{ textAlign: "right" }}>
+                    <StatusBadge value={selectedPeminjaman.status} size="md" />
+                    <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--on-surface-variant)", fontWeight: 600 }}>
+                      Peminjaman Ruang
+                    </div>
                   </div>
                 </div>
+
+                <div className="workflow-progress-track" style={{ height: "4px", backgroundColor: "var(--surface-container-high)", borderRadius: "4px", overflow: "hidden", marginBottom: "24px" }}>
+                  <span style={{ display: "block", height: "100%", width: "100%", backgroundColor: "var(--primary)" }} />
+                </div>
+
+                <DataTable<any>
+                  data={[
+                    { label: "Tanggal", value: formatDateOnly(selectedPeminjaman.tanggal) },
+                    { label: "Waktu Mulai", value: formatDateTime(selectedPeminjaman.waktuMulai) },
+                    { label: "Waktu Selesai", value: formatDateTime(selectedPeminjaman.waktuSelesai) },
+                    { label: "Keperluan", value: selectedPeminjaman.keperluan || "-" },
+                    { label: "Alasan / Catatan", value: selectedPeminjaman.alasan || "-" },
+                    { label: "Reviewer", value: selectedPeminjaman.reviewedBy?.name || "-" },
+                    { label: "Reviewed At", value: formatDateTime(selectedPeminjaman.reviewedAt) }
+                  ]}
+                  columns={[
+                    { key: "label", header: "Informasi", width: "30%", render: (item) => <strong>{item.label}</strong> },
+                    { key: "value", header: "Detail", render: (item) => item.value }
+                  ]}
+                  compact
+                  emptyMessage="Tidak ada data."
+                  getRowKey={(item) => item.label}
+                />
 
                 {canReviewSelected ? (
                   <div className="drawer-section">

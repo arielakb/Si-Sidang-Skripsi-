@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
 import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
+import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
 import {
@@ -75,9 +75,8 @@ export default function AssignPembimbingPage() {
     return skripsiRows
       .filter((item: any) => isAssignableStatus(item.status))
       .filter((item: any) =>
-        `${item.title ?? ""} ${item.mahasiswa?.name ?? ""} ${
-          item.mahasiswa?.identifier ?? ""
-        } ${item.status ?? ""} ${getPembimbingLabel(item)}`
+        `${item.title ?? ""} ${item.mahasiswa?.name ?? ""} ${item.mahasiswa?.identifier ?? ""
+          } ${item.status ?? ""} ${getPembimbingLabel(item)}`
           .toLowerCase()
           .includes(keyword)
       );
@@ -188,115 +187,102 @@ export default function AssignPembimbingPage() {
       {pageError ? <div className="alert-error">{pageError}</div> : null}
 
       <section className="list-card">
-        <div className="table-toolbar master-table-toolbar">
-          <div>
-            <h2>Daftar Skripsi Siap Bimbingan</h2>
-            <p className="muted">
-              Setelah pembimbing ditetapkan, status skripsi berubah menjadi BIMBINGAN.
-            </p>
-          </div>
-
-          <div className="master-toolbar-actions">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari judul, mahasiswa, status, pembimbing..."
+        <DataTable
+          data={filteredRows}
+          isLoading={skripsiQuery.isLoading || dosenQuery.isLoading}
+          emptyMessage="Belum ada skripsi yang siap assign pembimbing"
+          toolbar={
+            <FilterToolbar
+              title="Daftar Skripsi Siap Bimbingan"
+              description="Setelah pembimbing ditetapkan, status skripsi berubah menjadi BIMBINGAN."
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Cari judul, mahasiswa, status, pembimbing..."
             />
-          </div>
-        </div>
+          }
+          columns={[
+            {
+              key: "no",
+              header: "No",
+              align: "center",
+              render: (_item, index) => index + 1
+            },
+            {
+              key: "skripsi",
+              header: "Skripsi",
+              render: (item: any) => (
+                <div className="table-title-cell">
+                  <strong>{item.title || "Tanpa judul"}</strong>
+                  <span>
+                    {item.mahasiswa?.name || "-"} •{" "}
+                    {item.mahasiswa?.identifier || "-"}
+                  </span>
+                </div>
+              )
+            },
+            {
+              key: "peminatan",
+              header: "Peminatan",
+              render: (item: any) => item.peminatan?.name || "-"
+            },
+            {
+              key: "status",
+              header: "Status",
+              align: "center",
+              render: (item: any) => <StatusBadge value={item.status} size="sm" />
+            },
+            {
+              key: "current",
+              header: "Pembimbing Saat Ini",
+              render: (item: any) => getPembimbingLabel(item)
+            },
+            {
+              key: "pilih",
+              header: "Pilih Pembimbing",
+              render: (item: any) => {
+                const selectedIds = getSelectedDosenIds(item);
 
-        {skripsiQuery.isLoading || dosenQuery.isLoading ? (
-          <EmptyState
-            title="Memuat data skripsi..."
-            description="Mohon tunggu sebentar."
-          />
-        ) : (
-          <DataTable
-            data={filteredRows}
-            emptyMessage="Belum ada skripsi yang siap assign pembimbing"
-            columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (_item, index) => index + 1
-              },
-              {
-                key: "skripsi",
-                header: "Skripsi",
-                render: (item: any) => (
-                  <div className="table-title-cell">
-                    <strong>{item.title || "Tanpa judul"}</strong>
-                    <span>
-                      {item.mahasiswa?.name || "-"} •{" "}
-                      {item.mahasiswa?.identifier || "-"}
-                    </span>
+                return (
+                  <div className="role-check-grid compact-check-grid">
+                    {dosenOptions.map((dosen: any) => (
+                      <label key={dosen.id} className="role-check-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(dosen.id)}
+                          onChange={() => toggleDosen(item.id, dosen.id)}
+                        />
+                        <span>
+                          <strong>{dosen.name}</strong>
+                          <small>{dosen.identifier || dosen.email || "-"}</small>
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                )
-              },
-              {
-                key: "peminatan",
-                header: "Peminatan",
-                render: (item: any) => item.peminatan?.name || "-"
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (item: any) => <StatusBadge value={item.status} size="sm" />
-              },
-              {
-                key: "current",
-                header: "Pembimbing Saat Ini",
-                render: (item: any) => getPembimbingLabel(item)
-              },
-              {
-                key: "pilih",
-                header: "Pilih Pembimbing",
-                render: (item: any) => {
-                  const selectedIds = getSelectedDosenIds(item);
-
-                  return (
-                    <div className="role-check-grid compact-check-grid">
-                      {dosenOptions.map((dosen: any) => (
-                        <label key={dosen.id} className="role-check-item">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(dosen.id)}
-                            onChange={() => toggleDosen(item.id, dosen.id)}
-                          />
-                          <span>
-                            <strong>{dosen.name}</strong>
-                            <small>{dosen.identifier || dosen.email || "-"}</small>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  );
-                }
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (item: any) => (
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={assignMutation.isPending}
-                      onClick={() => handleAssign(item)}
-                    >
-                      {assignMutation.isPending
-                        ? "Menyimpan..."
-                        : "Simpan Pembimbing"}
-                    </button>
-                  </div>
-                )
+                );
               }
-            ]}
-          />
-        )}
+            },
+            {
+              key: "actions",
+              header: "Aksi",
+              align: "right",
+              render: (item: any) => (
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={assignMutation.isPending}
+                    onClick={() => handleAssign(item)}
+                  >
+                    {assignMutation.isPending
+                      ? "Menyimpan..."
+                      : "Simpan Pembimbing"}
+                  </button>
+                </div>
+              )
+            }
+          ]}
+        />
+
       </section>
     </section>
   );
