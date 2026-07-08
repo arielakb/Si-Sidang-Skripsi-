@@ -167,7 +167,7 @@ function getRoleContextLabel(roles: string[]) {
 
 function getMenuLabel(item: MenuItem, roles: string[]) {
   if (item.key === "skripsi" && roles.includes("mahasiswa")) {
-    return "Skripsi Saya";
+    return "Daftar Seminar Proposal";
   }
 
   if (item.key === "progress" && roles.includes("mahasiswa")) {

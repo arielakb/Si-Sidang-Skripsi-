@@ -4,6 +4,7 @@ import ActionGroup from "../../components/ui/ActionGroup";
 import DataTable from "../../components/ui/DataTable";
 import DetailPanel from "../../components/ui/DetailPanel";
 import EmptyState from "../../components/ui/EmptyState";
+import FileDownloadButton from "../../components/FileDownloadButton";
 import FilterToolbar from "../../components/ui/FilterToolbar";
 import SectionCard from "../../components/ui/SectionCard";
 import PageHeader from "../../components/ui/PageHeader";
@@ -17,6 +18,7 @@ import {
   type WorkflowItem,
   type WorkflowStage
 } from "../../services/workflow";
+import { getRuang } from "../../services/masterData";
 
 type ActionFormState = {
   hasil: string;
@@ -27,6 +29,7 @@ type ActionFormState = {
   waktuMulai: string;
   waktuSelesai: string;
   tempatManual: string;
+  ruangId: string;
   linkVicon: string;
   dosenIds: string[];
   file: File | null;
@@ -41,6 +44,7 @@ const emptyActionForm: ActionFormState = {
   waktuMulai: "",
   waktuSelesai: "",
   tempatManual: "",
+  ruangId: "",
   linkVicon: "",
   dosenIds: [],
   file: null
@@ -63,7 +67,8 @@ const pengujiActionKeys = new Set([
 const mahasiswaActionKeys = new Set([
   "UPLOAD_BERKAS",
   "UPLOAD_REVISI_SEMHAS",
-  "DAFTAR_ULANG_SEMPRO"
+  "DAFTAR_ULANG_SEMPRO",
+  "UPLOAD_BERKAS_FINAL"
 ]);
 
 function formatDateTime(value?: string | null) {
@@ -189,6 +194,10 @@ function getActionButtonLabel(action: WorkflowAction) {
     return "Upload Revisi Semhas";
   }
 
+  if (action.key === "UPLOAD_BERKAS_FINAL") {
+    return "Upload Berkas Final / Revisi Akhir";
+  }
+
   if (action.key === "APPROVE_REVISI_SEMHAS") {
     return "Setujui Revisi Semhas";
   }
@@ -240,6 +249,12 @@ export default function WorkflowSidangPage() {
     queryKey: ["workflow", "dosen-options"],
     queryFn: getDosenPengujiOptions,
     enabled: Boolean(selectedAction?.key === "ASSIGN_PENGUJI" || selectedAction?.key === "ASSIGN_PEMBIMBING")
+  });
+
+  const ruangQuery = useQuery({
+    queryKey: ["workflow", "ruang-options"],
+    queryFn: () => getRuang({ includeInactive: false }),
+    enabled: selectedAction?.key === "BUAT_JADWAL"
   });
 
   const workflows = workflowQuery.data?.data ?? [];
@@ -328,7 +343,7 @@ export default function WorkflowSidangPage() {
           waktuSelesai: buildDateTimeValue(form.tanggal, form.waktuSelesai),
           tempatManual: form.tempatManual || null,
           linkVicon: form.linkVicon || null,
-          ruangId: null
+          ruangId: form.ruangId || null
         });
       }
 
@@ -546,6 +561,26 @@ export default function WorkflowSidangPage() {
                   }))
                 }
               />
+            </label>
+
+            <label className="form-field">
+              <span>Ruang Sidang</span>
+              <select
+                value={form.ruangId}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    ruangId: event.target.value
+                  }))
+                }
+              >
+                <option value="">Pilih ruang (atau isi manual di bawah)</option>
+                {ruangQuery.data?.map((ruang) => (
+                  <option key={ruang.id} value={ruang.id}>
+                    {ruang.code} - {ruang.name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="form-field">
@@ -1016,6 +1051,25 @@ export default function WorkflowSidangPage() {
                             <span key={kategori} className="workflow-chip">
                               Kurang {formatStatus(kategori)}
                             </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {stage.berkas?.length ? (
+                        <div className="workflow-mini-list">
+                          {stage.berkas.map((berkas) => (
+                            <div key={berkas.id} className="workflow-mini-row">
+                              <div>
+                                <strong>{formatStatus(berkas.kategori)}</strong>
+                                <span>
+                                  {berkas.originalName || berkas.fileName || "Berkas"}
+                                </span>
+                              </div>
+                              <FileDownloadButton
+                                berkasId={berkas.id}
+                                fileName={berkas.originalName || berkas.fileName || "berkas.pdf"}
+                              />
+                            </div>
                           ))}
                         </div>
                       ) : null}

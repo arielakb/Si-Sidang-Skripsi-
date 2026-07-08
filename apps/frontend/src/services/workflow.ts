@@ -28,7 +28,8 @@ export type WorkflowActionKey =
   | "APPROVE_REVISI_SEMHAS"
   | "DAFTAR_ULANG_SEMPRO"
   | "ASSIGN_PEMBIMBING"
-  | "APPROVE_MAJU_SEMHAS";
+  | "APPROVE_MAJU_SEMHAS"
+  | "UPLOAD_BERKAS_FINAL";
 
 export type WorkflowActionType = "FORM" | "UPLOAD" | "LINK";
 

@@ -9,10 +9,10 @@ const requiredEnv = [
   "JWT_REFRESH_SECRET",
   "JWT_ACCESS_EXPIRES_IN",
   "JWT_REFRESH_EXPIRES_IN",
-  "UPLOAD_DIR",
-  "MAX_FILE_SIZE_MB",
   "CORS_ORIGIN",
-  "REFRESH_TOKEN_COOKIE_NAME"
+  "REFRESH_TOKEN_COOKIE_NAME",
+  "SUPABASE_URL",
+  "SUPABASE_KEY"
 ];
 
 for (const key of requiredEnv) {
@@ -33,6 +33,10 @@ export const env = {
   database: {
     url: process.env.DATABASE_URL
   },
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_KEY
+  },
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET,
     refreshSecret: process.env.JWT_REFRESH_SECRET,
@@ -40,8 +44,7 @@ export const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN
   },
   upload: {
-    dir: process.env.UPLOAD_DIR,
-    maxFileSizeMb: Number(process.env.MAX_FILE_SIZE_MB)
+    maxFileSizeMb: Number(process.env.MAX_FILE_SIZE_MB || 10)
   },
   security: {
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS || 12),
@@ -55,8 +58,8 @@ export const env = {
     )
   },
   cookie: {
-  secure: process.env.COOKIE_SECURE === "true",
-  sameSite: process.env.COOKIE_SAME_SITE || "lax",
-  refreshTokenCookieName: process.env.REFRESH_TOKEN_COOKIE_NAME
+    secure: process.env.COOKIE_SECURE === "true",
+    sameSite: process.env.COOKIE_SAME_SITE || "lax",
+    refreshTokenCookieName: process.env.REFRESH_TOKEN_COOKIE_NAME
   }
 };

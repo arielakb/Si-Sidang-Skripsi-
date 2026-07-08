@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
 import { prisma } from "../../config/prisma.js";
+import { buildWorkflowPayload, getWorkflowRulesMap } from "../workflow/workflow.service.js";
 
 function buildDateWhere(query) {
   const { startDate, endDate } = query;
@@ -105,7 +106,9 @@ async function getSkripsiReportRows(query) {
   });
 }
 
-function mapSkripsiRow(item, index) {
+async function mapSkripsiRowWithWorkflow(item, index, rulesMap) {
+  const workflow = buildWorkflowPayload(item, rulesMap, null, []);
+
   const validBimbinganCount = item.bimbinganLogs.filter(
     (log) => log.status === "DIVALIDASI"
   ).length;
@@ -130,8 +133,8 @@ function mapSkripsiRow(item, index) {
     judul: item.title || "-",
     peminatan: item.peminatan?.name || "-",
     jenisSkripsi: item.jenisSkripsi?.name || "-",
-    tahap: item.tahap,
-    status: item.status,
+    tahap: workflow.currentStageLabel || item.tahap || "-",
+    status: workflow.summaryStatus || item.status || "-",
     pembimbing: pembimbing || "-",
     penguji: penguji || "-",
     bimbinganValid: validBimbinganCount,
@@ -278,6 +281,8 @@ export async function getLaporanSkripsi(req, res, next) {
     const skip = (currentPage - 1) * pageSize;
     const where = buildSkripsiWhere(req.query);
 
+    const rulesMap = await getWorkflowRulesMap();
+
     const [total, data] = await prisma.$transaction([
       prisma.skripsi.count({ where }),
       prisma.skripsi.findMany({
@@ -326,9 +331,11 @@ export async function getLaporanSkripsi(req, res, next) {
       })
     ]);
 
+    const mappedData = await Promise.all(data.map((item, idx) => mapSkripsiRowWithWorkflow(item, idx, rulesMap)));
+
     return res.json({
       success: true,
-      data: data.map(mapSkripsiRow),
+      data: mappedData,
       meta: {
         page: currentPage,
         limit: pageSize,
@@ -343,8 +350,9 @@ export async function getLaporanSkripsi(req, res, next) {
 
 export async function exportLaporanSkripsiExcel(req, res, next) {
   try {
+    const rulesMap = await getWorkflowRulesMap();
     const rows = await getSkripsiReportRows(req.query);
-    const mappedRows = rows.map(mapSkripsiRow);
+    const mappedRows = await Promise.all(rows.map((row, idx) => mapSkripsiRowWithWorkflow(row, idx, rulesMap)));
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Sisidang";
@@ -406,8 +414,9 @@ export async function exportLaporanSkripsiExcel(req, res, next) {
 
 export async function exportLaporanSkripsiPdf(req, res, next) {
   try {
+    const rulesMap = await getWorkflowRulesMap();
     const rows = await getSkripsiReportRows(req.query);
-    const mappedRows = rows.map(mapSkripsiRow);
+    const mappedRows = await Promise.all(rows.map((row, idx) => mapSkripsiRowWithWorkflow(row, idx, rulesMap)));
 
     const doc = new PDFDocument({
       size: "A4",

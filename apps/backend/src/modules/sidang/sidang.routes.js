@@ -11,11 +11,12 @@ import {
   registerSeminarProposalAttempt,
   uploadBerkasSidang,
   uploadRevisiSeminarHasilSidang,
-  uploadSuratPerjanjianSidang
+  uploadSuratPerjanjianSidang,
+  uploadBerkasFinalSidang
 } from "./sidang.controller.js";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { requirePermission } from "../../middlewares/require-permission.js";
-import { uploadPdf } from "../../middlewares/upload/file-upload.js";
+import { uploadPdf, uploadToSupabase } from "../../middlewares/upload/file-upload.js";
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
+  uploadToSupabase,
   uploadRevisiSeminarHasilSidang
 );
 
@@ -95,6 +97,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
+  uploadToSupabase,
   uploadBerkasSidang
 );
 
@@ -103,7 +106,17 @@ router.post(
   authenticate,
   requirePermission("sidang.upload_surat"),
   uploadPdf.single("file"),
+  uploadToSupabase,
   uploadSuratPerjanjianSidang
+);
+
+router.post(
+  "/:sidangId/upload-berkas-final",
+  authenticate,
+  requirePermission("berkas.upload"),
+  uploadPdf.single("file"),
+  uploadToSupabase,
+  uploadBerkasFinalSidang
 );
 
 export default router;

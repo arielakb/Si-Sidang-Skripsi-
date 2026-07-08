@@ -52,10 +52,9 @@ export default function AssignPembimbingPage() {
   const [successMessage, setSuccessMessage] = useState("");
 
   const skripsiQuery = useQuery({
-    queryKey: ["kompre-skripsi-list"],
+    queryKey: ["skripsi-list-assign"],
     queryFn: () =>
       getSkripsiList({
-        tahap: "KOMPRE",
         limit: 100
       })
   });
@@ -96,7 +95,7 @@ export default function AssignPembimbingPage() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["kompre-skripsi-list"]
+          queryKey: ["skripsi-list-assign"]
         }),
         queryClient.invalidateQueries({
           queryKey: ["skripsi"]

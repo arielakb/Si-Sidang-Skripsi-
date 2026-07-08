@@ -8,7 +8,6 @@ import {
   getBimbinganBySkripsi,
   rejectBimbingan,
   requestBimbingan,
-  validateBimbingan
 } from "../../services/bimbingan";
 import { getBimbinganCounter } from "../../services/skripsi";
 import {
@@ -20,6 +19,7 @@ import {
   type WorkflowStage
 } from "../../services/workflow";
 import type { BimbinganLog } from "../../types/bimbingan";
+import DetailPanel from "../../components/ui/DetailPanel";
 import StatusBadge from "../../components/ui/StatusBadge";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -110,6 +110,13 @@ export default function BimbinganPage() {
     jadwalMulai: "",
     jadwalSelesai: "",
     topik: ""
+  });
+
+  const [actionDialogLog, setActionDialogLog] = useState<BimbinganLog | null>(null);
+  const [actionDialogMode, setActionDialogMode] = useState<"confirm" | "reject" | "complete" | null>(null);
+  const [actionForm, setActionForm] = useState({
+    hasil: "",
+    catatanDosen: ""
   });
 
   const workflowQuery = useQuery({
@@ -252,31 +259,11 @@ export default function BimbinganPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
       queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] });
+      setActionDialogMode(null);
+      setActionDialogLog(null);
     },
     onError: (error) => {
       alert(getApiErrorMessage(error, "Gagal mengisi hasil bimbingan."));
-    }
-  });
-
-  const validateMutation = useMutation({
-    mutationFn: ({
-      id,
-      catatanMahasiswa
-    }: {
-      id: string;
-      catatanMahasiswa?: string;
-    }) =>
-      validateBimbingan(id, {
-        catatanMahasiswa
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bimbingan"] });
-      queryClient.invalidateQueries({ queryKey: ["bimbingan-counter"] });
-      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi-list-for-bimbingan"] });
-      queryClient.invalidateQueries({ queryKey: ["workflow-skripsi"] });
-    },
-    onError: (error) => {
-      alert(getApiErrorMessage(error, "Gagal memvalidasi bimbingan."));
     }
   });
 
@@ -319,8 +306,8 @@ export default function BimbinganPage() {
     bimbinganStage?.progress
       ? validCount >= requiredCount
       : counterQuery.data?.canRequestSidang ??
-        bimbinganQuery.data?.meta?.canRequestSidang ??
-        validCount >= requiredCount;
+      bimbinganQuery.data?.meta?.canRequestSidang ??
+      validCount >= requiredCount;
 
   const percentage = Math.min(
     Math.round((validCount / Math.max(requiredCount, 1)) * 100),
@@ -345,50 +332,36 @@ export default function BimbinganPage() {
     requestMutation.mutate();
   }
 
-  function handleConfirm(log: BimbinganLog) {
-    const catatanDosen =
-      window.prompt("Catatan dosen untuk persetujuan bimbingan:", "") || "";
+  function handleActionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    confirmMutation.mutate({
-      id: log.id,
-      catatanDosen
-    });
-  }
+    if (!actionDialogLog || !actionDialogMode) return;
 
-  function handleReject(log: BimbinganLog) {
-    const catatanDosen =
-      window.prompt("Alasan penolakan pengajuan bimbingan:", "") || "";
-
-    rejectMutation.mutate({
-      id: log.id,
-      catatanDosen
-    });
-  }
-
-  function handleComplete(log: BimbinganLog) {
-    const hasil = window.prompt("Isi hasil bimbingan:", "");
-
-    if (!hasil) {
-      return;
+    if (actionDialogMode === "confirm") {
+      confirmMutation.mutate({
+        id: actionDialogLog.id,
+        catatanDosen: actionForm.catatanDosen
+      });
+    } else if (actionDialogMode === "reject") {
+      rejectMutation.mutate({
+        id: actionDialogLog.id,
+        catatanDosen: actionForm.catatanDosen
+      });
+    } else if (actionDialogMode === "complete") {
+      completeMutation.mutate({
+        id: actionDialogLog.id,
+        hasil: actionForm.hasil,
+        catatanDosen: actionForm.catatanDosen
+      });
     }
-
-    const catatanDosen =
-      window.prompt("Catatan tambahan dosen:", "") || "";
-
-    completeMutation.mutate({
-      id: log.id,
-      hasil,
-      catatanDosen
-    });
   }
 
-  function handleValidate(log: BimbinganLog) {
-    const catatanMahasiswa =
-      window.prompt("Catatan konfirmasi mahasiswa:", "") || "";
-
-    validateMutation.mutate({
-      id: log.id,
-      catatanMahasiswa
+  function openActionDialog(log: BimbinganLog, mode: "confirm" | "reject" | "complete") {
+    setActionDialogLog(log);
+    setActionDialogMode(mode);
+    setActionForm({
+      hasil: "",
+      catatanDosen: ""
     });
   }
 
@@ -666,20 +639,20 @@ export default function BimbinganPage() {
 
               <div className="row-inline">
                 {isDosenPembimbing &&
-                isPembimbingAktifUntukSkripsi &&
-                log.status === "DIAJUKAN" ? (
+                  isPembimbingAktifUntukSkripsi &&
+                  log.status === "DIAJUKAN" ? (
                   <>
                     <button
                       className="secondary-button"
                       type="button"
-                      onClick={() => handleConfirm(log)}
+                      onClick={() => openActionDialog(log, "confirm")}
                     >
                       Setujui
                     </button>
                     <button
                       className="secondary-button"
                       type="button"
-                      onClick={() => handleReject(log)}
+                      onClick={() => openActionDialog(log, "reject")}
                     >
                       Tolak
                     </button>
@@ -687,24 +660,14 @@ export default function BimbinganPage() {
                 ) : null}
 
                 {isDosenPembimbing &&
-                isPembimbingAktifUntukSkripsi &&
-                log.status === "DISETUJUI" ? (
+                  isPembimbingAktifUntukSkripsi &&
+                  log.status === "DISETUJUI" ? (
                   <button
                     className="primary-button"
                     type="button"
-                    onClick={() => handleComplete(log)}
+                    onClick={() => openActionDialog(log, "complete")}
                   >
                     Isi Hasil Bimbingan
-                  </button>
-                ) : null}
-
-                {isMahasiswa && log.status === "SELESAI" ? (
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => handleValidate(log)}
-                  >
-                    Konfirmasi Bimbingan
                   </button>
                 ) : null}
               </div>
@@ -712,6 +675,82 @@ export default function BimbinganPage() {
           ))
         )}
       </section>
+
+      <DetailPanel
+        open={Boolean(actionDialogMode && actionDialogLog)}
+        title={
+          actionDialogMode === "confirm"
+            ? "Setujui Bimbingan"
+            : actionDialogMode === "reject"
+              ? "Tolak Bimbingan"
+              : "Isi Hasil Bimbingan"
+        }
+        subtitle={`Topik: ${actionDialogLog?.topik || "-"}`}
+        onClose={() => {
+          setActionDialogMode(null);
+          setActionDialogLog(null);
+        }}
+        width="md"
+      >
+        <form className="form-stack" onSubmit={handleActionSubmit}>
+          {actionDialogMode === "complete" ? (
+            <label className="form-field">
+              <span>Hasil Bimbingan</span>
+              <textarea
+                value={actionForm.hasil}
+                onChange={(e) =>
+                  setActionForm((current) => ({
+                    ...current,
+                    hasil: e.target.value
+                  }))
+                }
+                placeholder="Deskripsikan hasil atau kesimpulan bimbingan..."
+                required
+                rows={4}
+              />
+            </label>
+          ) : null}
+
+          <label className="form-field">
+            <span>
+              Catatan Dosen{" "}
+              {actionDialogMode !== "reject" && <small>(Opsional)</small>}
+            </span>
+            <textarea
+              value={actionForm.catatanDosen}
+              onChange={(e) =>
+                setActionForm((current) => ({
+                  ...current,
+                  catatanDosen: e.target.value
+                }))
+              }
+              placeholder={
+                actionDialogMode === "reject"
+                  ? "Alasan penolakan pengajuan bimbingan..."
+                  : "Catatan tambahan untuk mahasiswa..."
+              }
+              required={actionDialogMode === "reject"}
+              rows={3}
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={
+              confirmMutation.isPending ||
+              rejectMutation.isPending ||
+              completeMutation.isPending
+            }
+          >
+            {confirmMutation.isPending ||
+              rejectMutation.isPending ||
+              completeMutation.isPending
+              ? "Menyimpan..."
+              : "Simpan"}
+          </button>
+        </form>
+      </DetailPanel>
     </section>
   );
 }

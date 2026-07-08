@@ -3,7 +3,6 @@ import type { ChangeEvent, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import FileDownloadButton from "../../components/FileDownloadButton";
 import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
 import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -153,9 +152,8 @@ export default function SkripsiPage() {
     const keyword = search.toLowerCase();
 
     return skripsiList.filter((item) =>
-      `${item.title ?? ""} ${item.abstract ?? ""} ${item.peminatan?.name ?? ""} ${
-        item.tahap ?? ""
-      } ${item.status ?? ""}`
+      `${item.title ?? ""} ${item.abstract ?? ""} ${item.peminatan?.name ?? ""} ${item.tahap ?? ""
+        } ${item.status ?? ""}`
         .toLowerCase()
         .includes(keyword)
     );
@@ -232,24 +230,24 @@ export default function SkripsiPage() {
       agreeKodeEtik(skripsiId, {
         statementVersion: "v1.0.0"
       }),
-      onSuccess: async () => {
-        await Promise.all([   
-          queryClient.invalidateQueries({
-            queryKey: ["my-seminar-proposals"]
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ["seminar-proposal"]
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ["skripsi"]
-          }),
-          queryClient.invalidateQueries({
-            queryKey: ["dashboard-summary"]
-          })
-        ]);
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["my-seminar-proposals"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["seminar-proposal"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
+      ]);
 
-        setPageError("");
-        setSuccessMessage("Kode etik berhasil disetujui.");
+      setPageError("");
+      setSuccessMessage("Kode etik berhasil disetujui.");
     },
     onError: (error) => {
       setSuccessMessage("");
@@ -280,37 +278,37 @@ export default function SkripsiPage() {
   });
 
   const statusSkripsiMutation = useMutation({
-  mutationFn: ({
-    skripsiId,
-    status
-  }: {
-    skripsiId: string;
-    status: "MENUNGGU_BERKAS" | "NONAKTIF";
-  }) =>
-    updateSkripsiStatus(skripsiId, {
+    mutationFn: ({
+      skripsiId,
       status
-    }),
-  onSuccess: async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: ["my-seminar-proposals"]
+    }: {
+      skripsiId: string;
+      status: "MENUNGGU_BERKAS" | "NONAKTIF";
+    }) =>
+      updateSkripsiStatus(skripsiId, {
+        status
       }),
-      queryClient.invalidateQueries({
-        queryKey: ["skripsi"]
-      }),
-      queryClient.invalidateQueries({
-        queryKey: ["dashboard-summary"]
-      })
-    ]);
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["my-seminar-proposals"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["skripsi"]
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard-summary"]
+        })
+      ]);
 
-    setPageError("");
-    setSuccessMessage("Status skripsi berhasil diperbarui.");
-  },
-  onError: (error) => {
-    setSuccessMessage("");
-    setPageError(getApiErrorMessage(error, "Gagal mengubah status skripsi."));
-  }
-});
+      setPageError("");
+      setSuccessMessage("Status skripsi berhasil diperbarui.");
+    },
+    onError: (error) => {
+      setSuccessMessage("");
+      setPageError(getApiErrorMessage(error, "Gagal mengubah status skripsi."));
+    }
+  });
 
   const deleteSkripsiMutation = useMutation({
     mutationFn: (skripsiId: string) => deleteSkripsiPermanent(skripsiId),
@@ -470,7 +468,7 @@ export default function SkripsiPage() {
   const latestSelectedSkripsi =
     selectedSkripsi
       ? skripsiList.find((item) => item.id === selectedSkripsi.id) ??
-        selectedSkripsi
+      selectedSkripsi
       : null;
 
   const proposalBerkas = latestSelectedSkripsi
@@ -479,9 +477,9 @@ export default function SkripsiPage() {
 
   const presentasiBerkas = latestSelectedSkripsi
     ? getLatestBerkasByKategori(
-        latestSelectedSkripsi.berkas ?? [],
-        "PRESENTASI"
-      )
+      latestSelectedSkripsi.berkas ?? [],
+      "PRESENTASI"
+    )
     : undefined;
 
   const kodeEtikAgreed = latestSelectedSkripsi
@@ -494,7 +492,7 @@ export default function SkripsiPage() {
     <section className="page-stack">
       <PageHeader
         eyebrow="Akademik"
-        title="Skripsi Saya"
+        title="Daftar Seminar Proposal"
         description="Kelola pendaftaran seminar proposal, kelengkapan berkas, dan status skripsi."
       />
 
@@ -543,103 +541,103 @@ export default function SkripsiPage() {
             />
           }
           columns={[
-              {
-                key: "no",
-                header: "No",
-                align: "center",
-                render: (_item, index) => index + 1
-              },
-              {
-                key: "title",
-                header: "Judul",
-                render: (item) => (
-                  <div className="table-title-cell">
-                    <strong>{item.title || "Tanpa judul"}</strong>
-                    <span>{formatDate(item.createdAt)}</span>
-                  </div>
-                )
-              },
-              {
-                key: "peminatan",
-                header: "Peminatan",
-                render: (item) => item.peminatan?.name || "-"
-              },
-              {
-                key: "tahap",
-                header: "Tahap",
-                render: (item) => item.tahap || "-"
-              },
-              {
-                key: "status",
-                header: "Status",
-                align: "center",
-                render: (item) => <StatusBadge value={item.status} size="sm" />
-              },
-              {
-                key: "statusAktif",
-                header: "Status Aktif",
-                align: "center",
-                render: (item) => (
-                  <StatusBadge value={getSkripsiActiveStatus(item)} size="sm" />
-                )
-              },
-              {
-                key: "berkas",
-                header: "Berkas",
-                align: "center",
-                render: (item) => (
-                  <div className="table-berkas-cell">
-                    <strong>{getCompletenessLabel(item)}</strong>
-                    <StatusBadge value={getCompletenessStatus(item)} size="sm" />
-                  </div>
-                )
-              },
-              {
-                key: "dosen",
-                header: "Dosen",
-                align: "center",
-                render: (item) => (item.dosenSkripsi ?? []).length
-              },
-              {
-                key: "actions",
-                header: "Aksi",
-                align: "right",
-                render: (item) => (
-                  <div className="table-actions">
+            {
+              key: "no",
+              header: "No",
+              align: "center",
+              render: (_item, index) => index + 1
+            },
+            {
+              key: "title",
+              header: "Judul",
+              render: (item) => (
+                <div className="table-title-cell">
+                  <strong>{item.title || "Tanpa judul"}</strong>
+                  <span>{formatDate(item.createdAt)}</span>
+                </div>
+              )
+            },
+            {
+              key: "peminatan",
+              header: "Peminatan",
+              render: (item) => item.peminatan?.name || "-"
+            },
+            {
+              key: "tahap",
+              header: "Tahap",
+              render: (item) => item.tahap || "-"
+            },
+            {
+              key: "status",
+              header: "Status",
+              align: "center",
+              render: (item) => <StatusBadge value={item.status} size="sm" />
+            },
+            {
+              key: "statusAktif",
+              header: "Status Aktif",
+              align: "center",
+              render: (item) => (
+                <StatusBadge value={getSkripsiActiveStatus(item)} size="sm" />
+              )
+            },
+            {
+              key: "berkas",
+              header: "Berkas",
+              align: "center",
+              render: (item) => (
+                <div className="table-berkas-cell">
+                  <strong>{getCompletenessLabel(item)}</strong>
+                  <StatusBadge value={getCompletenessStatus(item)} size="sm" />
+                </div>
+              )
+            },
+            {
+              key: "dosen",
+              header: "Dosen",
+              align: "center",
+              render: (item) => (item.dosenSkripsi ?? []).length
+            },
+            {
+              key: "actions",
+              header: "Aksi",
+              align: "right",
+              render: (item) => (
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => openDetailDrawer(item)}
+                  >
+                    Kelola
+                  </button>
+
+                  {canUpdateSkripsi ? (
                     <button
                       type="button"
-                      className="secondary-button"
-                      onClick={() => openDetailDrawer(item)}
+                      className={isSkripsiActive(item) ? "danger-button" : "primary-button"}
+                      disabled={statusSkripsiMutation.isPending}
+                      onClick={() => handleToggleSkripsiStatus(item)}
                     >
-                      Kelola
+                      {isSkripsiActive(item) ? "Nonaktifkan" : "Aktifkan"}
                     </button>
+                  ) : null}
 
-                    {canUpdateSkripsi ? (
-                      <button
-                        type="button"
-                        className={isSkripsiActive(item) ? "danger-button" : "primary-button"}
-                        disabled={statusSkripsiMutation.isPending}
-                        onClick={() => handleToggleSkripsiStatus(item)}
-                      >
-                        {isSkripsiActive(item) ? "Nonaktifkan" : "Aktifkan"}
-                      </button>
-                    ) : null}
-
-                    {canDeletePermanent ? (
-                      <button
-                        type="button"
-                        className="danger-button"
-                        disabled={deleteSkripsiMutation.isPending}
-                        onClick={() => handleDeleteSkripsiPermanent(item)}
-                      >
-                        Hapus Permanen
-                      </button>
-                    ) : null}
-                  </div>
-                )
-              }
-            ]}
-          />
+                  {canDeletePermanent ? (
+                    <button
+                      type="button"
+                      className="danger-button"
+                      disabled={deleteSkripsiMutation.isPending}
+                      onClick={() => handleDeleteSkripsiPermanent(item)}
+                    >
+                      Hapus Permanen
+                    </button>
+                  ) : null}
+                </div>
+              )
+            }
+          ]}
+        />
       </section>
 
       {drawerMode ? (
@@ -853,7 +851,7 @@ export default function SkripsiPage() {
 
                         <label className="upload-button">
                           {uploadingKey ===
-                          `${latestSelectedSkripsi.id}-presentasi`
+                            `${latestSelectedSkripsi.id}-presentasi`
                             ? "Mengupload..."
                             : presentasiBerkas
                               ? "Upload Ulang"
@@ -956,46 +954,46 @@ export default function SkripsiPage() {
                     ))}
                   </div>
                 ) : null}
-              {canUpdateSkripsi || canDeletePermanent ? (
-                <div className="drawer-section danger-zone">
-                  <h3>Manajemen Skripsi</h3>
-                  <p className="muted">
-                    Nonaktifkan digunakan untuk menyimpan riwayat tanpa menghapus data.
-                    Hapus permanen hanya bisa dilakukan jika skripsi belum memiliki data
-                    akademik penting.
-                  </p>
+                {canUpdateSkripsi || canDeletePermanent ? (
+                  <div className="drawer-section danger-zone">
+                    <h3>Manajemen Skripsi</h3>
+                    <p className="muted">
+                      Nonaktifkan digunakan untuk menyimpan riwayat tanpa menghapus data.
+                      Hapus permanen hanya bisa dilakukan jika skripsi belum memiliki data
+                      akademik penting.
+                    </p>
 
-                  <div className="table-actions">
-                    {canUpdateSkripsi ? (
-                      <button
-                        type="button"
-                        className={
-                          isSkripsiActive(latestSelectedSkripsi)
-                            ? "danger-button"
-                            : "primary-button"
-                        }
-                        disabled={statusSkripsiMutation.isPending}
-                        onClick={() => handleToggleSkripsiStatus(latestSelectedSkripsi)}
-                      >
-                        {isSkripsiActive(latestSelectedSkripsi)
-                          ? "Nonaktifkan Skripsi"
-                          : "Aktifkan Skripsi"}
-                      </button>
-                    ) : null}
+                    <div className="table-actions">
+                      {canUpdateSkripsi ? (
+                        <button
+                          type="button"
+                          className={
+                            isSkripsiActive(latestSelectedSkripsi)
+                              ? "danger-button"
+                              : "primary-button"
+                          }
+                          disabled={statusSkripsiMutation.isPending}
+                          onClick={() => handleToggleSkripsiStatus(latestSelectedSkripsi)}
+                        >
+                          {isSkripsiActive(latestSelectedSkripsi)
+                            ? "Nonaktifkan Skripsi"
+                            : "Aktifkan Skripsi"}
+                        </button>
+                      ) : null}
 
-                    {canDeletePermanent ? (
-                      <button
-                        type="button"
-                        className="danger-button"
-                        disabled={deleteSkripsiMutation.isPending}
-                        onClick={() => handleDeleteSkripsiPermanent(latestSelectedSkripsi)}
-                      >
-                        Hapus Permanen
-                      </button>
-                    ) : null}
+                      {canDeletePermanent ? (
+                        <button
+                          type="button"
+                          className="danger-button"
+                          disabled={deleteSkripsiMutation.isPending}
+                          onClick={() => handleDeleteSkripsiPermanent(latestSelectedSkripsi)}
+                        >
+                          Hapus Permanen
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
               </div>
             ) : null}
           </aside>

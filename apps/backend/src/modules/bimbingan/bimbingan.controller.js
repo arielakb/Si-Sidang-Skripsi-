@@ -368,22 +368,51 @@ export async function completeBimbingan(req, res, next) {
       data: {
         hasil,
         catatanDosen,
-        status: "SELESAI"
+        status: "DIVALIDASI",
+        validatedAt: new Date()
       }
     });
+
+    const validCount = await prisma.bimbinganLog.count({
+      where: {
+        skripsiId: bimbingan.skripsiId,
+        status: "DIVALIDASI"
+      }
+    });
+
+    const progressPercent = Math.min(35 + validCount * 4, 70);
+
+    await prisma.gamification.upsert({
+      where: {
+        skripsiId: bimbingan.skripsiId
+      },
+      update: {
+        progressPercent,
+        points: {
+          increment: 10
+        }
+      },
+      create: {
+        skripsiId: bimbingan.skripsiId,
+        progressPercent,
+        points: 10
+      }
+    });
+
+    const requiredCount = await getRequiredBimbinganCount();
 
     await createNotification({
       userId: bimbingan.mahasiswaId,
       title: "Hasil Bimbingan Telah Diisi",
-      message: "Silakan konfirmasi bimbingan agar masuk ke counter valid.",
-      type: "BIMBINGAN_SELESAI",
+      message: `Dosen telah mengisi hasil bimbingan dan otomatis divalidasi. Counter saat ini ${validCount}/${requiredCount}.`,
+      type: "BIMBINGAN_DIVALIDASI",
       entityType: "bimbingan",
       entityId: bimbingan.id
     });
 
     return res.json({
       success: true,
-      message: "Hasil bimbingan berhasil disimpan",
+      message: "Hasil bimbingan berhasil disimpan dan otomatis divalidasi",
       data: updated
     });
   } catch (error) {

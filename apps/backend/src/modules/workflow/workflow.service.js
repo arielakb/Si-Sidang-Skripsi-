@@ -226,7 +226,7 @@ function workflowInclude() {
   };
 }
 
-async function getWorkflowRulesMap() {
+export async function getWorkflowRulesMap() {
   const rules = await prisma.workflowRule.findMany({
     where: {
       isActive: true
@@ -664,6 +664,30 @@ function buildSidangActions({
   }
 
   if (
+    jenis === "SIDANG_AKHIR" &&
+    sidang.hasil === "LULUS" &&
+    mahasiswaOwner
+  ) {
+    const hasFinalBerkas = skripsi.berkas?.some(
+      (b) => b.kategori === "BERKAS_FINAL" || b.kategori === "REVISI_AKHIR"
+    );
+
+    if (!hasFinalBerkas) {
+      actions.push(
+        action("UPLOAD_BERKAS_FINAL", "Upload Berkas Final", {
+          type: "UPLOAD",
+          endpoint: `/sidang/${sidang.id}/upload-berkas-final`,
+          method: "POST",
+          sidangId: sidang.id,
+          skripsiId: skripsi.id,
+          jenis,
+          kategori: "BERKAS_FINAL"
+        })
+      );
+    }
+  }
+
+  if (
     jenis === "SEMINAR_PROPOSAL" &&
     sidang.hasil === "LOLOS" &&
     (isSidangPengujiForUser(sidang, userId) || canManageSidangForRole(roles)) &&
@@ -989,7 +1013,7 @@ function getFinalStatus(stages) {
   return null;
 }
 
-function buildWorkflowPayload(skripsi, rulesMap, userId, roles) {
+export function buildWorkflowPayload(skripsi, rulesMap, userId, roles) {
   const latestSempro = getLatestSidangByJenis(skripsi.sidang, "SEMINAR_PROPOSAL");
   const latestSemhas = getLatestSidangByJenis(skripsi.sidang, "SEMINAR_HASIL");
   const latestKompre = getLatestSidangByJenis(skripsi.sidang, "SIDANG_KOMPRE");

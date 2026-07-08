@@ -2111,3 +2111,80 @@ export async function uploadBerkasSidang(req, res, next) {
     return next(error);
   }
 }
+
+export async function uploadBerkasFinalSidang(req, res, next) {
+  try {
+    const { sidangId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "File berkas final wajib diupload"
+      });
+    }
+
+    const sidang = await prisma.sidang.findUnique({
+      where: {
+        id: sidangId
+      },
+      include: {
+        skripsi: {
+          include: {
+            mahasiswa: true
+          }
+        }
+      }
+    });
+
+    if (!sidang) {
+      return res.status(404).json({
+        success: false,
+        message: "Sidang tidak ditemukan"
+      });
+    }
+
+    if (sidang.skripsi.mahasiswaId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Anda tidak memiliki akses upload berkas untuk sidang ini"
+      });
+    }
+
+    if (sidang.jenis !== "SIDANG_AKHIR" || sidang.hasil !== "LULUS") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Berkas final hanya dapat diupload setelah sidang akhir dinyatakan lulus"
+      });
+    }
+
+    const filePayload = getUploadedFilePayload(req.file);
+
+    const berkas = await prisma.berkas.create({
+      data: {
+        skripsiId: sidang.skripsiId,
+        sidangId: sidang.id,
+        uploadedById: req.user.id,
+        kategori: "BERKAS_FINAL",
+        status: "DISETUJUI",
+        ...filePayload
+      }
+    });
+
+    await prisma.skripsi.update({
+      where: { id: sidang.skripsiId },
+      data: {
+        status: "LULUS_SKRIPSI",
+        selesaiAt: new Date()
+      }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Berkas final berhasil diupload",
+      data: berkas
+    });
+  } catch (error) {
+    return next(error);
+  }
+}

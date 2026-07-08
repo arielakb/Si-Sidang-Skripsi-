@@ -1,29 +1,11 @@
-import fs from "fs";
-import path from "path";
 import multer from "multer";
 import { env } from "../../config/env.js";
+import { createClient } from "@supabase/supabase-js";
 
-function ensureDirectoryExists(directoryPath) {
-  if (!fs.existsSync(directoryPath)) {
-    fs.mkdirSync(directoryPath, { recursive: true });
-  }
-}
+// Initialize Supabase Client
+const supabase = createClient(env.supabase.url, env.supabase.key);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(env.upload.dir, "seminar-proposal");
-    ensureDirectoryExists(uploadPath);
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const safeOriginalName = file.originalname
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9.\-_]/g, "");
-
-    const uniqueName = `${Date.now()}-${cryptoRandom()}-${safeOriginalName}`;
-    cb(null, uniqueName);
-  }
-});
+const storage = multer.memoryStorage();
 
 function cryptoRandom() {
   return Math.random().toString(36).slice(2, 10);
@@ -46,3 +28,47 @@ export const uploadPdf = multer({
     fileSize: env.upload.maxFileSizeMb * 1024 * 1024
   }
 });
+
+// Middleware to upload to Supabase Storage
+export async function uploadToSupabase(req, res, next) {
+  if (!req.file) {
+    return next();
+  }
+
+  try {
+    const safeOriginalName = req.file.originalname
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9.\-_]/g, "");
+    
+    const uniqueName = `${Date.now()}-${cryptoRandom()}-${safeOriginalName}`;
+    const bucketName = "berkas";
+    const filePath = `seminar-proposal/${uniqueName}`; // We keep the folder structure for organization
+
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false
+      });
+
+    if (error) {
+      console.error("Supabase Storage Error:", error);
+      throw new Error(`Failed to upload to Supabase: ${error.message}`);
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    // Overwrite the path with the Supabase public URL
+    // so controllers that read req.file.path continue to work seamlessly
+    req.file.path = publicUrlData.publicUrl;
+    req.file.filename = uniqueName;
+
+    next();
+  } catch (error) {
+    console.error("Error in uploadToSupabase middleware:", error);
+    next(error);
+  }
+}
