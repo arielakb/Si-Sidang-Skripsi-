@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DataTable from "../../components/ui/DataTable";
-import EmptyState from "../../components/ui/EmptyState";
 import FilterToolbar from "../../components/ui/FilterToolbar";
 import MetricCard from "../../components/ui/MetricCard";
 import PageHeader from "../../components/ui/PageHeader";
