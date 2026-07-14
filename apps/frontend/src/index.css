@@ -2627,3 +2627,100 @@ textarea:focus {
     padding: 16px;
   }
 }
+
+/* ================================================
+   WORKFLOW TABS
+   ================================================ */
+
+.workflow-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.workflow-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.workflow-tabs-global {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 0.5rem;
+}
+
+.workflow-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.workflow-tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.workflow-tab.active {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.workflow-detail-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.workflow-detail-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.workflow-detail-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.workflow-detail-tab:hover {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.workflow-detail-tab.active {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: var(--primary);
+}
+
+.workflow-detail-tab.completed:not(.active) {
+  color: var(--text);
+}
+
+.workflow-detail-tab .tab-icon {
+  font-size: 0.9rem;
+}

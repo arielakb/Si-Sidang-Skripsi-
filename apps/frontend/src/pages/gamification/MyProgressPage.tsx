@@ -131,6 +131,80 @@ function getMetrics(rows: WorkflowItem[]) {
   ];
 }
 
+function WorkflowHistoryCardItem({ workflow }: { workflow: WorkflowItem }) {
+  const sortedStages = getSortedStages(workflow);
+  const current =
+    sortedStages.find((s) => !s.isComplete) ||
+    sortedStages[sortedStages.length - 1];
+  const [activeTab, setActiveTab] = useState<string | null>(
+    current?.key || null
+  );
+
+  return (
+    <article className="workflow-history-card">
+      <div className="workflow-history-head">
+        <div>
+          <p className="eyebrow">
+            {workflow.skripsi.mahasiswa?.identifier || "-"}
+          </p>
+          <h2>{workflow.skripsi.title || "Tanpa judul"}</h2>
+          <p className="muted">
+            {workflow.skripsi.mahasiswa?.name || "-"} •{" "}
+            {workflow.currentStageLabel}
+          </p>
+        </div>
+
+        <div className="workflow-final-status">
+          <StatusBadge
+            value={getFinalStatus(workflow) || workflow.summaryStatus}
+            size="md"
+          />
+          <strong>{workflow.progressPercent}%</strong>
+        </div>
+      </div>
+
+      <div className="workflow-progress-track">
+        <span style={{ width: `${workflow.progressPercent}%` }} />
+      </div>
+
+      <div className="workflow-detail-tabs">
+        {sortedStages.map((stage) => (
+          <button
+            key={stage.key}
+            type="button"
+            className={`workflow-detail-tab ${
+              activeTab === stage.key ? "active" : ""
+            } ${stage.isComplete ? "completed" : ""}`}
+            onClick={() => setActiveTab(stage.key)}
+          >
+            <span className="tab-label">{stage.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="workflow-stage-list">
+        {sortedStages
+          .filter((stage) => stage.key === activeTab)
+          .map((stage) => (
+            <div key={stage.key} className="workflow-stage-row">
+              <div>
+                <strong>{stage.label}</strong>
+                <span>{getStageDescription(stage)}</span>
+              </div>
+
+              <StatusBadge
+                value={
+                  stage.isComplete ? stage.hasil || "SELESAI" : stage.status
+                }
+                size="sm"
+              />
+            </div>
+          ))}
+      </div>
+    </article>
+  );
+}
+
 export default function MyProgressPage() {
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState("");
@@ -191,6 +265,32 @@ export default function MyProgressPage() {
         }
       />
 
+      <div className="workflow-tabs workflow-tabs-global">
+        <button
+          type="button"
+          className={`workflow-tab ${stage === "" ? "active" : ""}`}
+          onClick={() => {
+            setStage("");
+            setPage(1);
+          }}
+        >
+          Semua Tahap
+        </button>
+        {stageOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`workflow-tab ${stage === option.value ? "active" : ""}`}
+            onClick={() => {
+              setStage(option.value);
+              setPage(1);
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       <div className="metric-grid">
         {metrics.map((metric) => (
           <MetricCard
@@ -214,18 +314,6 @@ export default function MyProgressPage() {
               onSearchChange={setSearch}
               searchPlaceholder="Cari mahasiswa, NPM, judul..."
             >
-              <div className="filter-field">
-                <label>Tahap</label>
-                <select value={stage} onChange={(event) => setStage(event.target.value)}>
-                  <option value="">Semua tahap</option>
-                  {stageOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div className="filter-field">
                 <label>Status</label>
                 <select
@@ -337,48 +425,10 @@ export default function MyProgressPage() {
         ) : (
           <div className="workflow-history-list">
             {rows.map((workflow) => (
-              <article key={workflow.skripsi.id} className="workflow-history-card">
-                <div className="workflow-history-head">
-                  <div>
-                    <p className="eyebrow">
-                      {workflow.skripsi.mahasiswa?.identifier || "-"}
-                    </p>
-                    <h2>{workflow.skripsi.title || "Tanpa judul"}</h2>
-                    <p className="muted">
-                      {workflow.skripsi.mahasiswa?.name || "-"} •{" "}
-                      {workflow.currentStageLabel}
-                    </p>
-                  </div>
-
-                  <div className="workflow-final-status">
-                    <StatusBadge
-                      value={getFinalStatus(workflow) || workflow.summaryStatus}
-                      size="md"
-                    />
-                    <strong>{workflow.progressPercent}%</strong>
-                  </div>
-                </div>
-
-                <div className="workflow-progress-track">
-                  <span style={{ width: `${workflow.progressPercent}%` }} />
-                </div>
-
-                <div className="workflow-stage-list">
-                  {getSortedStages(workflow).map((stage) => (
-                    <div key={stage.key} className="workflow-stage-row">
-                      <div>
-                        <strong>{stage.label}</strong>
-                        <span>{getStageDescription(stage)}</span>
-                      </div>
-
-                      <StatusBadge
-                        value={stage.isComplete ? stage.hasil || "SELESAI" : stage.status}
-                        size="sm"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </article>
+              <WorkflowHistoryCardItem
+                key={workflow.skripsi.id}
+                workflow={workflow}
+              />
             ))}
           </div>
         )}

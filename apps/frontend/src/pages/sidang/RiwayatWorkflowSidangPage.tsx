@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
 import DataTable from "../../components/ui/DataTable";
@@ -214,6 +214,13 @@ export default function RiwayatWorkflowSidangPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [selectedGroup, setSelectedGroup] = useState<WorkflowGroup | null>(null);
+  const [detailActiveTab, setDetailActiveTab] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedGroup) {
+      setDetailActiveTab(selectedGroup.currentStage);
+    }
+  }, [selectedGroup]);
 
   const sidangQuery = useQuery({
     queryKey: ["sidang", "workflow-riwayat"],
@@ -304,6 +311,32 @@ export default function RiwayatWorkflowSidangPage() {
         description="Pantau perjalanan mahasiswa dari Seminar Proposal, Seminar Hasil, Sidang Kompre, hingga Sidang Akhir."
       />
 
+      <div className="workflow-tabs workflow-tabs-global">
+        <button
+          type="button"
+          className={`workflow-tab ${stageFilter === "" ? "active" : ""}`}
+          onClick={() => {
+            setStageFilter("");
+            setPage(1);
+          }}
+        >
+          Semua Tahap
+        </button>
+        {workflowOrder.map((stage) => (
+          <button
+            key={stage}
+            type="button"
+            className={`workflow-tab ${stageFilter === stage ? "active" : ""}`}
+            onClick={() => {
+              setStageFilter(stage);
+              setPage(1);
+            }}
+          >
+            {workflowLabels[stage]}
+          </button>
+        ))}
+      </div>
+
       <div className="metric-grid">
         <MetricCard
           label="Total Riwayat"
@@ -355,24 +388,6 @@ export default function RiwayatWorkflowSidangPage() {
                 </span>
               }
             >
-              <div className="filter-field">
-                <label>Tahap</label>
-                <select
-                  value={stageFilter}
-                  onChange={(event) => {
-                    setStageFilter(event.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="">Semua Tahap</option>
-                  {workflowOrder.map((stage) => (
-                    <option key={stage} value={stage}>
-                      {workflowLabels[stage]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div className="filter-field">
                 <label>Status</label>
                 <select
@@ -528,8 +543,29 @@ export default function RiwayatWorkflowSidangPage() {
               <span style={{ width: `${selectedGroup.progressPercent}%` }} />
             </div>
 
+            <div className="workflow-detail-tabs">
+              {workflowOrder
+                .filter((stage) =>
+                  selectedGroup.rows.some((r) => r.jenis === stage)
+                )
+                .map((stage) => (
+                  <button
+                    key={stage}
+                    type="button"
+                    className={`workflow-detail-tab ${
+                      detailActiveTab === stage ? "active" : ""
+                    }`}
+                    onClick={() => setDetailActiveTab(stage)}
+                  >
+                    <span className="tab-label">{workflowLabels[stage]}</span>
+                  </button>
+                ))}
+            </div>
+
             <DataTable<SidangItem>
-              data={selectedGroup.rows}
+              data={selectedGroup.rows.filter(
+                (r) => r.jenis === detailActiveTab
+              )}
               emptyMessage="Belum ada tahap"
               compact
               columns={[

@@ -5,12 +5,9 @@ WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
 
 COPY apps/backend/package*.json ./
-
-RUN npm install
-
 COPY apps/backend/prisma ./prisma
 
-RUN npm run prisma:generate
+RUN npm install
 
 COPY apps/backend ./
 
