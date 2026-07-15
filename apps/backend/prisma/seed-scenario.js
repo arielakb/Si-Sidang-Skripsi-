@@ -13,11 +13,13 @@ const defaultPassword = "pancasila123";
 // ============================================================
 
 const lecturers = [
-  { identifier: "dyah_s", name: "Dyah Sulistyowati, S.Kom., M.Kom", roles: ["ketua_prodi", "dosen_koordinator", "dosen_penguji", "dosen_pembimbing"] },
-  { identifier: "bambang_r", name: "Bambang Riono, S.Kom., MMSI", roles: ["dosen_penguji", "dosen_pembimbing"] },
-  { identifier: "amir_m", name: "Amir Murtako, S.Kom., M.Kom", roles: ["dosen_penguji", "dosen_pembimbing"] },
-  { identifier: "adi_w", name: "Adi Wahyu Pribadi, S.Si., M.Kom", roles: ["dosen_penguji", "dosen_pembimbing"] },
-  { identifier: "sri_r", name: "Dra. Sri Rezeki C. Nursari, M.Kom", roles: ["dosen_penguji", "dosen_pembimbing"] }
+  { identifier: "dyah_s", name: "Dyah Sulistyowati, S.Kom., M.Kom", roles: ["ketua_prodi"] },
+  { identifier: "ninuk_w", name: "Ninuk Wiliani, S.Si., M.Kom", roles: ["dosen_koordinator"] },
+  { identifier: "bambang_r", name: "Bambang Riono, S.Kom., MMSI", roles: ["dosen_penguji"] },
+  { identifier: "sri_r", name: "Dra. Sri Rezeki C. Nursari, M.Kom", roles: ["dosen_penguji"] },
+  { identifier: "amir_m", name: "Amir Murtako, S.Kom., M.Kom", roles: ["dosen_pembimbing"] },
+  { identifier: "adi_w", name: "Adi Wahyu Pribadi, S.Si., M.Kom", roles: ["dosen_pembimbing"] },
+  { identifier: "andiani", name: "Dr. Andiani, Dra., M.Kom", roles: ["dosen_pembimbing"] }
 ];
 
 const staffs = [
@@ -27,8 +29,7 @@ const staffs = [
 
 const studentNames = [
   "Andi Pratama", "Budi Santoso", "Citra Dewi", "Dian Purnama", "Eka Saputra",
-  "Fajar Hidayat", "Gita Rahmawati", "Hendra Wijaya", "Intan Permata", "Joko Susilo",
-  "Karina Putri", "Luthfi Rahman", "Maya Anggraini", "Naufal Hakim", "Olivia Sari"
+  "Fajar Hidayat", "Gita Rahmawati", "Hendra Wijaya", "Intan Permata", "Joko Susilo"
 ];
 
 const skripsiTitles = [
@@ -41,15 +42,10 @@ const skripsiTitles = [
   "Klasifikasi Citra Medis Menggunakan Convolutional Neural Network",
   "Desain dan Implementasi RESTful API Gateway untuk Sistem Terdistribusi",
   "Analisis Big Data untuk Optimalisasi Rantai Pasok Industri Manufaktur",
-  "Pengembangan Sistem Rekomendasi Film Menggunakan Collaborative Filtering",
-  "Implementasi Zero Trust Architecture pada Infrastruktur Cloud Enterprise",
-  "Visualisasi Data Geospasial untuk Pemetaan Risiko Bencana Alam",
-  "Pengembangan Progressive Web App untuk Sistem Manajemen Inventaris",
-  "Deteksi Anomali pada Network Traffic Menggunakan Machine Learning",
-  "Rancang Bangun Sistem Monitoring Kualitas Udara Berbasis IoT dan Dashboard Real-time"
+  "Pengembangan Sistem Rekomendasi Film Menggunakan Collaborative Filtering"
 ];
 
-const peminatanMapping = ["ai", "ncs", "ds", "se", "ai", "ncs", "ds", "se", "ai", "ncs", "ds", "se", "ai", "ncs", "ds"];
+const peminatanMapping = ["ai", "ncs", "ds", "se", "ai", "ncs", "ds", "se", "ai", "ncs"];
 
 const students = studentNames.map((name, i) => ({
   identifier: `45192100${String(i + 1).padStart(2, "0")}`,
@@ -122,7 +118,24 @@ function hoursAfter(date, hours) {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
+import fs from "fs";
+import path from "path";
+
 async function addBerkas(skripsiId, uploadedById, kategori, status, sidangId = null) {
+  const fileName = `${kategori.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.pdf`;
+  const uploadDir = path.join(process.cwd(), "uploads", "berkas");
+  
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const filePath = path.join(uploadDir, fileName);
+  
+  // Create a minimal valid dummy PDF file
+  const dummyPdfContent = "%PDF-1.4\n%\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n2 0 obj\n<<\n/Type /Pages\n/Count 1\n/Kids [3 0 R]\n>>\nendobj\n3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Contents 4 0 R\n/Resources <<\n/Font <<\n/F1 <<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n>>\n>>\n>>\n>>\nendobj\n4 0 obj\n<<\n/Length 73\n>>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n(This is a dummy PDF file for testing) Tj\nET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \n0000000015 00000 n \n0000000064 00000 n \n0000000121 00000 n \n0000000259 00000 n \ntrailer\n<<\n/Size 5\n/Root 1 0 R\n>>\nstartxref\n382\n%%EOF\n";
+  
+  fs.writeFileSync(filePath, dummyPdfContent);
+
   return prisma.berkas.create({
     data: {
       skripsiId,
@@ -131,10 +144,10 @@ async function addBerkas(skripsiId, uploadedById, kategori, status, sidangId = n
       kategori,
       status,
       originalName: `${kategori.toLowerCase()}_document.pdf`,
-      fileName: `${kategori.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.pdf`,
+      fileName: fileName,
       mimeType: "application/pdf",
-      sizeBytes: BigInt(Math.floor(Math.random() * 500000) + 50000),
-      path: `/uploads/dummy/${kategori.toLowerCase()}.pdf`,
+      sizeBytes: BigInt(Buffer.byteLength(dummyPdfContent)),
+      path: `http://localhost:3000/uploads/berkas/${fileName}`,
     }
   });
 }
@@ -215,7 +228,6 @@ async function addNilai(skripsiId, sidangId, dosenId, komponen, nilai, bobot) {
 async function main() {
   await clearData();
 
-  // --- Buat Users ---
   console.log("👨‍🏫 Membuat Dosen dan Staff...");
   const dosen = {};
   for (const l of lecturers) {
@@ -225,14 +237,16 @@ async function main() {
     dosen[s.identifier] = await createUser(s);
   }
 
-  const dyah = dosen["dyah_s"];
-  const bambang = dosen["bambang_r"];
-  const amir = dosen["amir_m"];
-  const adi = dosen["adi_w"];
-  const sri = dosen["sri_r"];
-  const ridho = dosen["ridho_a"];
+  const dyah = dosen["dyah_s"]; // Kaprodi
+  const ninuk = dosen["ninuk_w"]; // Koordinator
+  const bambang = dosen["bambang_r"]; // Penguji
+  const sri = dosen["sri_r"]; // Penguji
+  const amir = dosen["amir_m"]; // Pembimbing
+  const adi = dosen["adi_w"]; // Pembimbing
+  const andiani = dosen["andiani"]; // Pembimbing
+  const ridho = dosen["ridho_a"]; // Admin/Staf
 
-  console.log("🎓 Membuat 15 Mahasiswa...");
+  console.log("🎓 Membuat 10 Mahasiswa...");
   const mhs = [];
   for (const s of students) {
     mhs.push(await createUser(s));
@@ -251,27 +265,33 @@ async function main() {
   const ruang = ruangList[0] || null;
 
   // ============================================================
-  // CASE 1 (Mhs 1): Baru daftar, belum upload berkas sempro
-  // Test: Mahasiswa bisa melihat dashboard kosong, upload proposal+presentasi
+  // CASE 1 (Andi): Baru daftar Sempro
+  // Test: Mhs belum upload berkas. Dosen tidak bisa apa-apa.
   // ============================================================
   console.log("📋 Case 1: Baru daftar seminar proposal (belum upload berkas)");
-  await prisma.skripsi.create({
-    data: {
-      mahasiswaId: mhs[0].id,
-      peminatanId: getPeminatan(peminatanMapping[0]).id,
-      jenisSkripsiId: jenisSkripsiList[0].id,
-      title: skripsiTitles[0],
-      abstract: "Penelitian ini membahas implementasi deep learning untuk deteksi penyakit tanaman.",
-      tahap: "SEMINAR_PROPOSAL",
-      status: "MENUNGGU_BERKAS"
-    }
-  });
+  {
+    const skripsi = await prisma.skripsi.create({
+      data: {
+        mahasiswaId: mhs[0].id,
+        peminatanId: getPeminatan(peminatanMapping[0]).id,
+        jenisSkripsiId: jenisSkripsiList[0].id,
+        title: skripsiTitles[0],
+        abstract: "Penelitian ini membahas implementasi deep learning.",
+        tahap: "SEMINAR_PROPOSAL",
+        status: "MENUNGGU_BERKAS"
+      }
+    });
+
+    await prisma.sidang.create({
+      data: { skripsiId: skripsi.id, jenis: "SEMINAR_PROPOSAL", attemptNo: 1, status: "MENUNGGU_BERKAS", createdById: mhs[0].id }
+    });
+  }
 
   // ============================================================
-  // CASE 2 (Mhs 2): Sudah upload berkas, menunggu penguji di-assign
-  // Test: Koordinator/Kaprodi bisa assign penguji, mahasiswa lihat status
+  // CASE 2 (Budi): Sempro - Menunggu Penguji
+  // Test: Berkas lengkap, Koordinator (Ninuk) assign penguji
   // ============================================================
-  console.log("📋 Case 2: Sempro - berkas sudah upload, menunggu assign penguji");
+  console.log("📋 Case 2: Sempro - berkas uploaded, menunggu assign penguji");
   {
     const skripsi = await prisma.skripsi.create({
       data: {
@@ -279,9 +299,9 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[1]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[1],
-        abstract: "Penelitian ini membahas sistem keamanan jaringan IoT.",
+        abstract: "Penelitian ini membahas IoT.",
         tahap: "SEMINAR_PROPOSAL",
-        status: "MENUNGGU_JADWAL"
+        status: "MENUNGGU_JADWAL" // Status di skripsi MENUNGGU_JADWAL
       }
     });
 
@@ -294,10 +314,10 @@ async function main() {
   }
 
   // ============================================================
-  // CASE 3 (Mhs 3): Sempro sudah ada penguji, menunggu jadwal
-  // Test: Koordinator/Kaprodi bisa buat jadwal sidang
+  // CASE 3 (Citra): Sempro - Menunggu Jadwal
+  // Test: Penguji ada, Koordinator (Ninuk) buat jadwal
   // ============================================================
-  console.log("📋 Case 3: Sempro - penguji sudah di-assign, menunggu jadwal");
+  console.log("📋 Case 3: Sempro - penguji assigned, menunggu jadwal");
   {
     const skripsi = await prisma.skripsi.create({
       data: {
@@ -305,27 +325,26 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[2]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[2],
-        abstract: "Penelitian ini membahas analisis sentimen media sosial.",
+        abstract: "Penelitian sentimen medsos.",
         tahap: "SEMINAR_PROPOSAL",
         status: "MENUNGGU_JADWAL"
       }
     });
 
-    const sidang = await prisma.sidang.create({
-      data: { skripsiId: skripsi.id, jenis: "SEMINAR_PROPOSAL", attemptNo: 1, status: "MENUNGGU_JADWAL", createdById: mhs[2].id }
-    });
+    const sidang = await createSidangWithPenguji(
+      skripsi.id, "SEMINAR_PROPOSAL", 1, "MENUNGGU_JADWAL", null,
+      [bambang.id, sri.id], ninuk.id
+    );
 
     await addBerkas(skripsi.id, mhs[2].id, "PROPOSAL", "DIAJUKAN", sidang.id);
     await addBerkas(skripsi.id, mhs[2].id, "PRESENTASI", "DIAJUKAN", sidang.id);
-    await prisma.sidangDosen.create({ data: { sidangId: sidang.id, dosenId: bambang.id, peran: "PENGUJI" } });
-    await prisma.sidangDosen.create({ data: { sidangId: sidang.id, dosenId: amir.id, peran: "PENGUJI" } });
   }
 
   // ============================================================
-  // CASE 4 (Mhs 4): Sempro sudah dijadwalkan, menunggu input hasil
-  // Test: Penguji bisa input hasil sidang (LOLOS/TIDAK_LOLOS/REVISI/ULANG)
+  // CASE 4 (Dian): Sempro - Dijadwalkan
+  // Test: Penguji (Bambang/Sri) input hasil (LOLOS/REVISI dsb)
   // ============================================================
-  console.log("📋 Case 4: Sempro - sudah dijadwalkan, menunggu input hasil");
+  console.log("📋 Case 4: Sempro - dijadwalkan, menunggu input hasil");
   {
     const skripsi = await prisma.skripsi.create({
       data: {
@@ -333,7 +352,7 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[3]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[3],
-        abstract: "Penelitian ini membahas pengembangan aplikasi e-commerce.",
+        abstract: "Aplikasi e-commerce microservices.",
         tahap: "SEMINAR_PROPOSAL",
         status: "SIAP_SIDANG"
       }
@@ -341,20 +360,18 @@ async function main() {
 
     const sidang = await createSidangWithPenguji(
       skripsi.id, "SEMINAR_PROPOSAL", 1, "DIJADWALKAN", null,
-      [adi.id, sri.id], dyah.id
+      [bambang.id, sri.id], ninuk.id
     );
 
     await addBerkas(skripsi.id, mhs[3].id, "PROPOSAL", "DIAJUKAN", sidang.id);
     await addBerkas(skripsi.id, mhs[3].id, "PRESENTASI", "DIAJUKAN", sidang.id);
 
-    if (ruang) {
-      await createJadwal(skripsi.id, sidang.id, ruang.id, dyah.id, -3);
-    }
+    if (ruang) await createJadwal(skripsi.id, sidang.id, ruang.id, ninuk.id, -3);
   }
 
   // ============================================================
-  // CASE 5 (Mhs 5): Sempro LOLOS, menunggu assign pembimbing
-  // Test: Koordinator bisa assign pembimbing setelah sempro lolos
+  // CASE 5 (Eka): Menunggu Pembimbing (Sempro Lolos)
+  // Test: Koordinator assign pembimbing (Amir, Adi, atau Andiani)
   // ============================================================
   console.log("📋 Case 5: Sempro lolos, menunggu assign pembimbing");
   {
@@ -364,7 +381,7 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[4]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[4],
-        abstract: "Penelitian ini membahas prediksi harga saham menggunakan LSTM.",
+        abstract: "Prediksi harga saham.",
         tahap: "KOMPRE",
         status: "MENUNGGU_PEMBIMBING",
         seminarApprovedAt: daysAgo(30)
@@ -373,7 +390,7 @@ async function main() {
 
     const sidang = await createSidangWithPenguji(
       skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS",
-      [bambang.id, amir.id], dyah.id
+      [bambang.id, sri.id], ninuk.id
     );
 
     await addBerkas(skripsi.id, mhs[4].id, "PROPOSAL", "DISETUJUI", sidang.id);
@@ -381,10 +398,10 @@ async function main() {
   }
 
   // ============================================================
-  // CASE 6 (Mhs 6): Bimbingan aktif, baru 3x bimbingan valid
-  // Test: Mahasiswa ajukan bimbingan, dosen konfirmasi/isi hasil, mhs validasi
+  // CASE 6 (Fajar): Bimbingan Aktif (Belum cukup)
+  // Test: Mhs ajukan bimbingan, Dosen (Amir/Adi) konfirmasi/isi hasil
   // ============================================================
-  console.log("📋 Case 6: Bimbingan aktif - 3 bimbingan valid (belum cukup)");
+  console.log("📋 Case 6: Bimbingan aktif - 4 bimbingan valid (belum cukup maju semhas)");
   {
     const skripsi = await prisma.skripsi.create({
       data: {
@@ -392,35 +409,32 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[5]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[5],
-        abstract: "Penelitian ini membahas perancangan sistem autentikasi multi-faktor.",
+        abstract: "Sistem autentikasi multi-faktor.",
         tahap: "KOMPRE",
         status: "BIMBINGAN",
         seminarApprovedAt: daysAgo(60)
       }
     });
 
-    const semproSidang = await createSidangWithPenguji(
+    const sidang = await createSidangWithPenguji(
       skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS",
-      [adi.id, sri.id], dyah.id
+      [bambang.id, sri.id], ninuk.id
     );
-    await addBerkas(skripsi.id, mhs[5].id, "PROPOSAL", "DISETUJUI", semproSidang.id);
-    await addBerkas(skripsi.id, mhs[5].id, "PRESENTASI", "DISETUJUI", semproSidang.id);
+    await addBerkas(skripsi.id, mhs[5].id, "PROPOSAL", "DISETUJUI", sidang.id);
+    await addBerkas(skripsi.id, mhs[5].id, "PRESENTASI", "DISETUJUI", sidang.id);
 
-    await assignPembimbing(skripsi.id, [bambang.id, amir.id], dyah.id);
+    // Assign pembimbing
+    await assignPembimbing(skripsi.id, [amir.id, adi.id], ninuk.id);
 
-    // 3 bimbingan valid
-    for (let j = 1; j <= 3; j++) {
-      await addBimbingan(skripsi.id, mhs[5].id, bambang.id, `Bimbingan Bab ${j} - Pembimbing 1`, "DIVALIDASI", 50 - j * 5);
+    for (let j = 1; j <= 2; j++) {
+      await addBimbingan(skripsi.id, mhs[5].id, amir.id, `Bab 1 & 2 - P1 - #${j}`, "DIVALIDASI", 50 - j * 5);
+      await addBimbingan(skripsi.id, mhs[5].id, adi.id, `Bab 1 & 2 - P2 - #${j}`, "DIVALIDASI", 48 - j * 5);
     }
-    // 1 bimbingan belum divalidasi (SELESAI - menunggu mahasiswa konfirmasi)
-    await addBimbingan(skripsi.id, mhs[5].id, amir.id, "Review Bab 2 - Pembimbing 2", "SELESAI", 5);
-    // 1 bimbingan DIAJUKAN (menunggu dosen konfirmasi)
-    await addBimbingan(skripsi.id, mhs[5].id, bambang.id, "Diskusi Metodologi Bab 3", "DIAJUKAN", 1);
   }
 
   // ============================================================
-  // CASE 7 (Mhs 7): Bimbingan selesai 8x, siap approve maju seminar hasil
-  // Test: Dosen pembimbing bisa klik "Approve Maju Seminar Hasil"
+  // CASE 7 (Gita): Bimbingan 8x (Siap Approve Semhas)
+  // Test: Pembimbing (Amir/Andiani) klik "Approve Maju Semhas"
   // ============================================================
   console.log("📋 Case 7: Bimbingan 8x valid - SIAP approve maju seminar hasil ⭐");
   {
@@ -430,35 +444,34 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[6]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[6],
-        abstract: "Penelitian ini membahas klasifikasi citra medis menggunakan CNN.",
+        abstract: "Klasifikasi citra medis CNN.",
         tahap: "KOMPRE",
         status: "BIMBINGAN",
         seminarApprovedAt: daysAgo(90)
       }
     });
 
-    const semproSidang = await createSidangWithPenguji(
+    const sidang = await createSidangWithPenguji(
       skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS",
-      [bambang.id, dyah.id], dyah.id
+      [bambang.id, sri.id], ninuk.id
     );
-    await addBerkas(skripsi.id, mhs[6].id, "PROPOSAL", "DISETUJUI", semproSidang.id);
-    await addBerkas(skripsi.id, mhs[6].id, "PRESENTASI", "DISETUJUI", semproSidang.id);
+    await addBerkas(skripsi.id, mhs[6].id, "PROPOSAL", "DISETUJUI", sidang.id);
+    await addBerkas(skripsi.id, mhs[6].id, "PRESENTASI", "DISETUJUI", sidang.id);
 
-    await assignPembimbing(skripsi.id, [adi.id, sri.id], dyah.id);
+    // Assign pembimbing
+    await assignPembimbing(skripsi.id, [amir.id, andiani.id], ninuk.id);
 
-    // 8 bimbingan DIVALIDASI (memenuhi syarat)
-    const topikBab = ["Pendahuluan", "Tinjauan Pustaka", "Metodologi", "Analisis", "Perancangan", "Implementasi", "Pengujian", "Kesimpulan"];
     for (let j = 0; j < 8; j++) {
-      const dosenBimbing = j % 2 === 0 ? adi.id : sri.id;
-      await addBimbingan(skripsi.id, mhs[6].id, dosenBimbing, `Bimbingan ${topikBab[j]}`, "DIVALIDASI", 80 - j * 8);
+      await addBimbingan(skripsi.id, mhs[6].id, amir.id, `Bimbingan Bab ${j+1} - P1`, "DIVALIDASI", 80 - j * 4);
+      await addBimbingan(skripsi.id, mhs[6].id, andiani.id, `Bimbingan Bab ${j+1} - P2`, "DIVALIDASI", 78 - j * 4);
     }
   }
 
   // ============================================================
-  // CASE 8 (Mhs 8): Seminar Hasil - menunggu upload berkas semhas
-  // Test: Mahasiswa upload berkas SIDANG_SOFTCOPY dan SIDANG_PRESENTASI
+  // CASE 8 (Hendra): Semhas Dijadwalkan
+  // Test: Penguji (Bambang/Sri) input nilai & hasil Semhas
   // ============================================================
-  console.log("📋 Case 8: Seminar Hasil - menunggu upload berkas");
+  console.log("📋 Case 8: Semhas - dijadwalkan, menunggu input nilai & hasil");
   {
     const skripsi = await prisma.skripsi.create({
       data: {
@@ -466,40 +479,7 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[7]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[7],
-        abstract: "Penelitian ini membahas desain dan implementasi RESTful API Gateway.",
-        tahap: "SIDANG_SKRIPSI",
-        status: "MENUNGGU_SEMINAR_HASIL",
-        seminarApprovedAt: daysAgo(100),
-        sidangApprovedAt: daysAgo(10)
-      }
-    });
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [amir.id, adi.id], dyah.id);
-    await assignPembimbing(skripsi.id, [bambang.id, sri.id], dyah.id);
-
-    for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[7].id, j % 2 === 0 ? bambang.id : sri.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 90 - j * 8);
-    }
-
-    // Sidang Seminar Hasil dibuat tapi berkas belum ada
-    await prisma.sidang.create({
-      data: { skripsiId: skripsi.id, jenis: "SEMINAR_HASIL", attemptNo: 1, status: "MENUNGGU_BERKAS", createdById: bambang.id }
-    });
-  }
-
-  // ============================================================
-  // CASE 9 (Mhs 9): Seminar Hasil - sudah dijadwalkan, menunggu nilai+hasil
-  // Test: Penguji input nilai, lalu input hasil (LOLOS/REVISI)
-  // ============================================================
-  console.log("📋 Case 9: Seminar Hasil - dijadwalkan, menunggu input nilai & hasil");
-  {
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: mhs[8].id,
-        peminatanId: getPeminatan(peminatanMapping[8]).id,
-        jenisSkripsiId: jenisSkripsiList[0].id,
-        title: skripsiTitles[8],
-        abstract: "Penelitian ini membahas analisis big data untuk optimalisasi rantai pasok.",
+        abstract: "RESTful API Gateway.",
         tahap: "SIDANG_SKRIPSI",
         status: "MENUNGGU_SEMINAR_HASIL",
         seminarApprovedAt: daysAgo(120),
@@ -507,30 +487,70 @@ async function main() {
       }
     });
 
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [sri.id, dyah.id], dyah.id);
-    await assignPembimbing(skripsi.id, [amir.id, adi.id], dyah.id);
+    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+    await assignPembimbing(skripsi.id, [adi.id, andiani.id], ninuk.id);
 
     for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[8].id, j % 2 === 0 ? amir.id : adi.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 100 - j * 8);
+      await addBimbingan(skripsi.id, mhs[7].id, adi.id, `Bimbingan ${j}`, "DIVALIDASI", 100 - j * 5);
+      await addBimbingan(skripsi.id, mhs[7].id, andiani.id, `Bimbingan ${j}`, "DIVALIDASI", 95 - j * 5);
     }
 
     const semhasSidang = await createSidangWithPenguji(
       skripsi.id, "SEMINAR_HASIL", 1, "DIJADWALKAN", null,
-      [bambang.id, dyah.id], dyah.id
+      [bambang.id, sri.id], ninuk.id
     );
-    await addBerkas(skripsi.id, mhs[8].id, "SIDANG_SOFTCOPY", "DIAJUKAN", semhasSidang.id);
-    await addBerkas(skripsi.id, mhs[8].id, "SIDANG_PRESENTASI", "DIAJUKAN", semhasSidang.id);
+    await addBerkas(skripsi.id, mhs[7].id, "SIDANG_SOFTCOPY", "DIAJUKAN", semhasSidang.id);
+    await addBerkas(skripsi.id, mhs[7].id, "SIDANG_PRESENTASI", "DIAJUKAN", semhasSidang.id);
 
-    if (ruang) {
-      await createJadwal(skripsi.id, semhasSidang.id, ruang.id, dyah.id, -5);
-    }
+    if (ruang) await createJadwal(skripsi.id, semhasSidang.id, ruang.id, ninuk.id, -5);
   }
 
   // ============================================================
-  // CASE 10 (Mhs 10): Seminar Hasil REVISI - menunggu upload revisi
-  // Test: Mahasiswa upload revisi, penguji/koordinator approve revisi
+  // CASE 9 (Intan): Sidang Akhir Dijadwalkan
+  // Test: Penguji input keputusan LULUS/TIDAK_LULUS
   // ============================================================
-  console.log("📋 Case 10: Seminar Hasil - hasil REVISI, menunggu upload revisi mhs");
+  console.log("📋 Case 9: Sidang Akhir - dijadwalkan, menunggu keputusan");
+  {
+    const skripsi = await prisma.skripsi.create({
+      data: {
+        mahasiswaId: mhs[8].id,
+        peminatanId: getPeminatan(peminatanMapping[8]).id,
+        jenisSkripsiId: jenisSkripsiList[0].id,
+        title: skripsiTitles[8],
+        abstract: "Big Data Supply Chain.",
+        tahap: "FINAL",
+        status: "MENUNGGU_SIDANG_AKHIR",
+        seminarApprovedAt: daysAgo(180),
+        sidangApprovedAt: daysAgo(60)
+      }
+    });
+
+    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+    await assignPembimbing(skripsi.id, [amir.id, adi.id], ninuk.id);
+
+    for (let j = 0; j < 8; j++) {
+      await addBimbingan(skripsi.id, mhs[8].id, amir.id, `Bim ${j}`, "DIVALIDASI", 150 - j * 5);
+      await addBimbingan(skripsi.id, mhs[8].id, adi.id, `Bim ${j}`, "DIVALIDASI", 145 - j * 5);
+    }
+
+    await createSidangWithPenguji(skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+    await createSidangWithPenguji(skripsi.id, "SIDANG_KOMPRE", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+
+    const sidangAkhir = await createSidangWithPenguji(
+      skripsi.id, "SIDANG_AKHIR", 1, "DIJADWALKAN", null,
+      [bambang.id, sri.id], ninuk.id
+    );
+
+    await addBerkas(skripsi.id, mhs[8].id, "FINAL_SKRIPSI", "DIAJUKAN", sidangAkhir.id);
+
+    if (ruang) await createJadwal(skripsi.id, sidangAkhir.id, ruang.id, ninuk.id, -10);
+  }
+
+  // ============================================================
+  // CASE 10 (Joko): LULUS SKRIPSI
+  // Test: Dashboard finish
+  // ============================================================
+  console.log("📋 Case 10: LULUS SKRIPSI - semua tahap complete ✅");
   {
     const skripsi = await prisma.skripsi.create({
       data: {
@@ -538,253 +558,40 @@ async function main() {
         peminatanId: getPeminatan(peminatanMapping[9]).id,
         jenisSkripsiId: jenisSkripsiList[0].id,
         title: skripsiTitles[9],
-        abstract: "Penelitian ini membahas pengembangan sistem rekomendasi film.",
-        tahap: "SIDANG_SKRIPSI",
-        status: "MENUNGGU_KOMPRE",
-        seminarApprovedAt: daysAgo(150),
-        sidangApprovedAt: daysAgo(40)
-      }
-    });
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [adi.id, amir.id], dyah.id);
-    await assignPembimbing(skripsi.id, [sri.id, dyah.id], dyah.id);
-
-    for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[9].id, j % 2 === 0 ? sri.id : dyah.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 130 - j * 10);
-    }
-
-    const semhasSidang = await createSidangWithPenguji(
-      skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "REVISI",
-      [bambang.id, amir.id], dyah.id
-    );
-
-    await addBerkas(skripsi.id, mhs[9].id, "SIDANG_SOFTCOPY", "DISETUJUI", semhasSidang.id);
-    await addBerkas(skripsi.id, mhs[9].id, "SIDANG_PRESENTASI", "DISETUJUI", semhasSidang.id);
-
-    // Revisi dari penguji (belum di-upload oleh mahasiswa)
-    await prisma.revisi.create({
-      data: {
-        skripsiId: skripsi.id,
-        sidangId: semhasSidang.id,
-        dibuatOlehId: bambang.id,
-        catatan: "Perbaiki bagian metodologi penelitian dan tambahkan referensi terbaru.",
-        status: "MENUNGGU_DIAJUKAN",
-        deadline: daysAgo(-14) // 14 hari ke depan
-      }
-    });
-  }
-
-  // ============================================================
-  // CASE 11 (Mhs 11): Sidang Kompre - menunggu assign penguji
-  // Test: Koordinator assign penguji sidang kompre
-  // ============================================================
-  console.log("📋 Case 11: Sidang Kompre - menunggu assign penguji");
-  {
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: mhs[10].id,
-        peminatanId: getPeminatan(peminatanMapping[10]).id,
-        jenisSkripsiId: jenisSkripsiList[0].id,
-        title: skripsiTitles[10],
-        abstract: "Penelitian ini membahas implementasi zero trust architecture.",
-        tahap: "SIDANG_SKRIPSI",
-        status: "MENUNGGU_KOMPRE",
-        seminarApprovedAt: daysAgo(180),
-        sidangApprovedAt: daysAgo(60)
-      }
-    });
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], dyah.id);
-    await assignPembimbing(skripsi.id, [amir.id, adi.id], dyah.id);
-
-    for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[10].id, j % 2 === 0 ? amir.id : adi.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 160 - j * 10);
-    }
-
-    // Semhas LOLOS
-    const semhasSidang = await createSidangWithPenguji(
-      skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS",
-      [dyah.id, sri.id], dyah.id
-    );
-    await addBerkas(skripsi.id, mhs[10].id, "SIDANG_SOFTCOPY", "DISETUJUI", semhasSidang.id);
-    await addBerkas(skripsi.id, mhs[10].id, "SIDANG_PRESENTASI", "DISETUJUI", semhasSidang.id);
-
-    // Kompre dibuat, menunggu penguji
-    await prisma.sidang.create({
-      data: { skripsiId: skripsi.id, jenis: "SIDANG_KOMPRE", attemptNo: 1, status: "MENUNGGU_PENGUJI", createdById: dyah.id }
-    });
-  }
-
-  // ============================================================
-  // CASE 12 (Mhs 12): Sidang Kompre - dijadwalkan, menunggu nilai+hasil
-  // Test: Penguji input nilai kompre, lalu input hasil
-  // ============================================================
-  console.log("📋 Case 12: Sidang Kompre - dijadwalkan, menunggu input nilai");
-  {
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: mhs[11].id,
-        peminatanId: getPeminatan(peminatanMapping[11]).id,
-        jenisSkripsiId: jenisSkripsiList[0].id,
-        title: skripsiTitles[11],
-        abstract: "Penelitian ini membahas visualisasi data geospasial.",
-        tahap: "SIDANG_SKRIPSI",
-        status: "MENUNGGU_KOMPRE",
-        seminarApprovedAt: daysAgo(200),
-        sidangApprovedAt: daysAgo(80)
-      }
-    });
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [amir.id, adi.id], dyah.id);
-    await assignPembimbing(skripsi.id, [bambang.id, dyah.id], dyah.id);
-
-    for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[11].id, j % 2 === 0 ? bambang.id : dyah.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 180 - j * 10);
-    }
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS", [sri.id, bambang.id], dyah.id);
-
-    const kompreSidang = await createSidangWithPenguji(
-      skripsi.id, "SIDANG_KOMPRE", 1, "DIJADWALKAN", null,
-      [amir.id, adi.id], dyah.id
-    );
-
-    if (ruang) {
-      await createJadwal(skripsi.id, kompreSidang.id, ruang.id, dyah.id, -7);
-    }
-  }
-
-  // ============================================================
-  // CASE 13 (Mhs 13): Sidang Akhir - menunggu upload berkas final
-  // Test: Mahasiswa upload FINAL_SKRIPSI, koordinator assign penguji
-  // ============================================================
-  console.log("📋 Case 13: Sidang Akhir - menunggu upload berkas final");
-  {
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: mhs[12].id,
-        peminatanId: getPeminatan(peminatanMapping[12]).id,
-        jenisSkripsiId: jenisSkripsiList[0].id,
-        title: skripsiTitles[12],
-        abstract: "Penelitian ini membahas pengembangan progressive web app.",
-        tahap: "FINAL",
-        status: "MENUNGGU_SIDANG_AKHIR",
-        seminarApprovedAt: daysAgo(240),
-        sidangApprovedAt: daysAgo(100)
-      }
-    });
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], dyah.id);
-    await assignPembimbing(skripsi.id, [adi.id, amir.id], dyah.id);
-
-    for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[12].id, j % 2 === 0 ? adi.id : amir.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 220 - j * 10);
-    }
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS", [dyah.id, bambang.id], dyah.id);
-    await createSidangWithPenguji(skripsi.id, "SIDANG_KOMPRE", 1, "SELESAI", "LOLOS", [sri.id, amir.id], dyah.id);
-
-    // Sidang Akhir dibuat - menunggu berkas FINAL_SKRIPSI
-    await prisma.sidang.create({
-      data: { skripsiId: skripsi.id, jenis: "SIDANG_AKHIR", attemptNo: 1, status: "MENUNGGU_BERKAS", createdById: dyah.id }
-    });
-  }
-
-  // ============================================================
-  // CASE 14 (Mhs 14): Sidang Akhir - dijadwalkan, menunggu keputusan LULUS/TIDAK
-  // Test: Penguji input keputusan akhir
-  // ============================================================
-  console.log("📋 Case 14: Sidang Akhir - dijadwalkan, menunggu keputusan lulus");
-  {
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: mhs[13].id,
-        peminatanId: getPeminatan(peminatanMapping[13]).id,
-        jenisSkripsiId: jenisSkripsiList[0].id,
-        title: skripsiTitles[13],
-        abstract: "Penelitian ini membahas deteksi anomali pada network traffic.",
-        tahap: "FINAL",
-        status: "MENUNGGU_SIDANG_AKHIR",
-        seminarApprovedAt: daysAgo(270),
-        sidangApprovedAt: daysAgo(120)
-      }
-    });
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [adi.id, amir.id], dyah.id);
-    await assignPembimbing(skripsi.id, [sri.id, bambang.id], dyah.id);
-
-    for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[13].id, j % 2 === 0 ? sri.id : bambang.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 250 - j * 10);
-    }
-
-    await createSidangWithPenguji(skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS", [dyah.id, adi.id], dyah.id);
-    await createSidangWithPenguji(skripsi.id, "SIDANG_KOMPRE", 1, "SELESAI", "LOLOS", [amir.id, bambang.id], dyah.id);
-
-    const sidangAkhir = await createSidangWithPenguji(
-      skripsi.id, "SIDANG_AKHIR", 1, "DIJADWALKAN", null,
-      [dyah.id, sri.id], dyah.id
-    );
-
-    const berkasF = await addBerkas(skripsi.id, mhs[13].id, "FINAL_SKRIPSI", "DIAJUKAN", sidangAkhir.id);
-
-    if (ruang) {
-      await createJadwal(skripsi.id, sidangAkhir.id, ruang.id, dyah.id, -10);
-    }
-  }
-
-  // ============================================================
-  // CASE 15 (Mhs 15): LULUS SKRIPSI - semua tahap selesai (contoh lengkap)
-  // Test: Dashboard menampilkan status lulus dengan nilai akhir
-  // ============================================================
-  console.log("📋 Case 15: LULUS SKRIPSI - semua tahap complete ✅");
-  {
-    const skripsi = await prisma.skripsi.create({
-      data: {
-        mahasiswaId: mhs[14].id,
-        peminatanId: getPeminatan(peminatanMapping[14]).id,
-        jenisSkripsiId: jenisSkripsiList[0].id,
-        title: skripsiTitles[14],
-        abstract: "Penelitian ini membahas rancang bangun sistem monitoring kualitas udara.",
+        abstract: "Sistem Rekomendasi Film.",
         tahap: "FINAL",
         status: "LULUS_SKRIPSI",
-        seminarApprovedAt: daysAgo(300),
-        sidangApprovedAt: daysAgo(150),
+        seminarApprovedAt: daysAgo(200),
+        sidangApprovedAt: daysAgo(100),
         selesaiAt: daysAgo(5),
-        nilaiAkhir: 87.5,
+        nilaiAkhir: 88.5,
         nilaiHuruf: "A"
       }
     });
 
-    const semproSidang = await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [bambang.id, amir.id], dyah.id);
-    await addBerkas(skripsi.id, mhs[14].id, "PROPOSAL", "DISETUJUI", semproSidang.id);
-    await addBerkas(skripsi.id, mhs[14].id, "PRESENTASI", "DISETUJUI", semproSidang.id);
-
-    await assignPembimbing(skripsi.id, [dyah.id, adi.id], dyah.id);
+    await createSidangWithPenguji(skripsi.id, "SEMINAR_PROPOSAL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+    await assignPembimbing(skripsi.id, [amir.id, andiani.id], ninuk.id);
 
     for (let j = 0; j < 8; j++) {
-      await addBimbingan(skripsi.id, mhs[14].id, j % 2 === 0 ? dyah.id : adi.id, `Bimbingan sesi ${j + 1}`, "DIVALIDASI", 280 - j * 10);
+      await addBimbingan(skripsi.id, mhs[9].id, amir.id, `Bim ${j}`, "DIVALIDASI", 190 - j * 5);
+      await addBimbingan(skripsi.id, mhs[9].id, andiani.id, `Bim ${j}`, "DIVALIDASI", 185 - j * 5);
     }
 
-    const semhasSidang = await createSidangWithPenguji(skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS", [sri.id, bambang.id], dyah.id);
-    await addBerkas(skripsi.id, mhs[14].id, "SIDANG_SOFTCOPY", "DISETUJUI", semhasSidang.id);
-    await addBerkas(skripsi.id, mhs[14].id, "SIDANG_PRESENTASI", "DISETUJUI", semhasSidang.id);
+    await createSidangWithPenguji(skripsi.id, "SEMINAR_HASIL", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+    
+    const kompre = await createSidangWithPenguji(skripsi.id, "SIDANG_KOMPRE", 1, "SELESAI", "LOLOS", [bambang.id, sri.id], ninuk.id);
+    await addNilai(skripsi.id, kompre.id, bambang.id, "kompre", 85, 30);
+    await addNilai(skripsi.id, kompre.id, sri.id, "kompre", 88, 30);
 
-    const kompreSidang = await createSidangWithPenguji(skripsi.id, "SIDANG_KOMPRE", 1, "SELESAI", "LOLOS", [amir.id, adi.id], dyah.id);
-    await addNilai(skripsi.id, kompreSidang.id, amir.id, "kompre", 85, 30);
-    await addNilai(skripsi.id, kompreSidang.id, adi.id, "kompre", 88, 30);
+    const akhir = await createSidangWithPenguji(skripsi.id, "SIDANG_AKHIR", 1, "SELESAI", "LULUS", [bambang.id, sri.id], ninuk.id);
+    await addBerkas(skripsi.id, mhs[9].id, "FINAL_SKRIPSI", "DISETUJUI", akhir.id);
+    await addBerkas(skripsi.id, mhs[9].id, "LEMBAR_PENGESAHAN", "DISETUJUI", akhir.id);
 
-    const sidangAkhir = await createSidangWithPenguji(skripsi.id, "SIDANG_AKHIR", 1, "SELESAI", "LULUS", [dyah.id, sri.id], dyah.id);
-    await addBerkas(skripsi.id, mhs[14].id, "FINAL_SKRIPSI", "DISETUJUI", sidangAkhir.id);
-    await addBerkas(skripsi.id, mhs[14].id, "LEMBAR_PENGESAHAN", "DISETUJUI");
+    await addNilai(skripsi.id, akhir.id, bambang.id, "sidang", 90, 40);
+    await addNilai(skripsi.id, akhir.id, sri.id, "sidang", 85, 40);
 
-    await addNilai(skripsi.id, sidangAkhir.id, dyah.id, "sidang", 90, 40);
-    await addNilai(skripsi.id, sidangAkhir.id, sri.id, "sidang", 85, 40);
+    if (ruang) await createJadwal(skripsi.id, akhir.id, ruang.id, ninuk.id, 5, "SELESAI");
 
-    if (ruang) {
-      await createJadwal(skripsi.id, sidangAkhir.id, ruang.id, dyah.id, 5, "SELESAI");
-    }
-
-    // Gamification
     await prisma.gamification.create({
       data: { skripsiId: skripsi.id, progressPercent: 100, points: 500 }
     });
@@ -797,24 +604,17 @@ async function main() {
   console.log("🎉 SKENARIO SEED SELESAI!");
   console.log("=".repeat(60));
   console.log(`Password default semua user: ${defaultPassword}`);
-  console.log("\n📊 Distribusi 15 mahasiswa ke berbagai case:\n");
-  console.log("  Case 1  (4519210001 - Andi Pratama)      → Baru daftar, belum upload berkas sempro");
-  console.log("  Case 2  (4519210002 - Budi Santoso)      → Sempro: berkas uploaded, menunggu assign penguji");
-  console.log("  Case 3  (4519210003 - Citra Dewi)        → Sempro: penguji assigned, menunggu jadwal");
-  console.log("  Case 4  (4519210004 - Dian Purnama)      → Sempro: dijadwalkan, menunggu input hasil");
-  console.log("  Case 5  (4519210005 - Eka Saputra)       → Sempro LOLOS, menunggu assign pembimbing");
-  console.log("  Case 6  (4519210006 - Fajar Hidayat)     → Bimbingan: 3x valid (ada yg DIAJUKAN & SELESAI)");
-  console.log("  Case 7  (4519210007 - Gita Rahmawati)    → Bimbingan: 8x valid ⭐ SIAP approve maju semhas");
-  console.log("  Case 8  (4519210008 - Hendra Wijaya)     → Semhas: menunggu upload berkas");
-  console.log("  Case 9  (4519210009 - Intan Permata)     → Semhas: dijadwalkan, menunggu nilai & hasil");
-  console.log("  Case 10 (4519210010 - Joko Susilo)       → Semhas: hasil REVISI, menunggu upload revisi");
-  console.log("  Case 11 (4519210011 - Karina Putri)      → Kompre: menunggu assign penguji");
-  console.log("  Case 12 (4519210012 - Luthfi Rahman)     → Kompre: dijadwalkan, menunggu input nilai");
-  console.log("  Case 13 (4519210013 - Maya Anggraini)    → Sidang Akhir: menunggu upload FINAL_SKRIPSI");
-  console.log("  Case 14 (4519210014 - Naufal Hakim)      → Sidang Akhir: dijadwalkan, menunggu keputusan");
-  console.log("  Case 15 (4519210015 - Olivia Sari)       → LULUS SKRIPSI ✅ (semua tahap selesai)");
-  console.log("\n👨‍🏫 Dosen: dyah_s, bambang_r, amir_m, adi_w, sri_r");
-  console.log("👨‍💼 Staff: ridho_a (admin+staf), wahyu_a (staf)");
+  console.log("\n📊 Distribusi 10 mahasiswa ke berbagai case:\n");
+  console.log("  Case 1  (4519210001 - Andi Pratama)   → Baru daftar, belum upload berkas sempro");
+  console.log("  Case 2  (4519210002 - Budi Santoso)   → Sempro: menunggu penguji di-assign");
+  console.log("  Case 3  (4519210003 - Citra Dewi)     → Sempro: menunggu jadwal dibuat");
+  console.log("  Case 4  (4519210004 - Dian Purnama)   → Sempro: dijadwalkan, menunggu input hasil");
+  console.log("  Case 5  (4519210005 - Eka Saputra)    → Sempro LOLOS, menunggu assign pembimbing");
+  console.log("  Case 6  (4519210006 - Fajar Hidayat)  → Bimbingan: 4x valid (belum cukup)");
+  console.log("  Case 7  (4519210007 - Gita Rahmawati) → Bimbingan: 8x valid ⭐ SIAP approve maju semhas");
+  console.log("  Case 8  (4519210008 - Hendra Wijaya)  → Semhas: dijadwalkan, menunggu nilai & hasil");
+  console.log("  Case 9  (4519210009 - Intan Permata)  → Sidang Akhir: dijadwalkan, menunggu keputusan");
+  console.log("  Case 10 (4519210010 - Joko Susilo)    → LULUS SKRIPSI ✅");
   console.log("=".repeat(60));
 }
 

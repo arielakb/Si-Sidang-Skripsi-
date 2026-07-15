@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../auth/AuthContext";
 import DataTable from "../../components/ui/DataTable";
+import DetailPanel from "../../components/ui/DetailPanel";
 import FilterToolbar from "../../components/ui/FilterToolbar";
 import PageHeader from "../../components/ui/PageHeader";
 import StatusBadge from "../../components/ui/StatusBadge";
@@ -48,6 +49,8 @@ export default function AssignPembimbingPage() {
 
   const [search, setSearch] = useState("");
   const [selectedDosenMap, setSelectedDosenMap] = useState<Record<string, string[]>>({});
+  const [selectedSkripsiForAssign, setSelectedSkripsiForAssign] = useState<any | null>(null);
+  const [dosenSearch, setDosenSearch] = useState("");
   const [pageError, setPageError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -110,6 +113,7 @@ export default function AssignPembimbingPage() {
 
       setPageError("");
       setSuccessMessage("Dosen pembimbing berhasil ditetapkan.");
+      setSelectedSkripsiForAssign(null);
     },
     onError: (error) => {
       setSuccessMessage("");
@@ -144,8 +148,10 @@ export default function AssignPembimbingPage() {
     });
   }
 
-  function handleAssign(item: any) {
-    const dosenIds = getSelectedDosenIds(item);
+  function handleAssign() {
+    if (!selectedSkripsiForAssign) return;
+
+    const dosenIds = getSelectedDosenIds(selectedSkripsiForAssign);
 
     setPageError("");
     setSuccessMessage("");
@@ -156,7 +162,7 @@ export default function AssignPembimbingPage() {
     }
 
     assignMutation.mutate({
-      skripsiId: item.id,
+      skripsiId: selectedSkripsiForAssign.id,
       dosenIds
     });
   }
@@ -236,31 +242,6 @@ export default function AssignPembimbingPage() {
               render: (item: any) => getPembimbingLabel(item)
             },
             {
-              key: "pilih",
-              header: "Pilih Pembimbing",
-              render: (item: any) => {
-                const selectedIds = getSelectedDosenIds(item);
-
-                return (
-                  <div className="role-check-grid compact-check-grid">
-                    {dosenOptions.map((dosen: any) => (
-                      <label key={dosen.id} className="role-check-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(dosen.id)}
-                          onChange={() => toggleDosen(item.id, dosen.id)}
-                        />
-                        <span>
-                          <strong>{dosen.name}</strong>
-                          <small>{dosen.identifier || dosen.email || "-"}</small>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                );
-              }
-            },
-            {
               key: "actions",
               header: "Aksi",
               align: "right",
@@ -269,12 +250,12 @@ export default function AssignPembimbingPage() {
                   <button
                     type="button"
                     className="primary-button"
-                    disabled={assignMutation.isPending}
-                    onClick={() => handleAssign(item)}
+                    onClick={() => {
+                      setSelectedSkripsiForAssign(item);
+                      setDosenSearch("");
+                    }}
                   >
-                    {assignMutation.isPending
-                      ? "Menyimpan..."
-                      : "Simpan Pembimbing"}
+                    Assign Dosen
                   </button>
                 </div>
               )
@@ -283,6 +264,79 @@ export default function AssignPembimbingPage() {
         />
 
       </section>
+
+      <DetailPanel
+        open={Boolean(selectedSkripsiForAssign)}
+        title="Pilih Dosen Pembimbing"
+        subtitle={selectedSkripsiForAssign?.title || "Tanpa judul"}
+        width="md"
+        onClose={() => setSelectedSkripsiForAssign(null)}
+      >
+        {selectedSkripsiForAssign ? (
+          <div className="page-stack">
+            <div className="workflow-history-head">
+              <div>
+                <p className="eyebrow">
+                  {selectedSkripsiForAssign.mahasiswa?.identifier || "-"}
+                </p>
+                <h2>{selectedSkripsiForAssign.mahasiswa?.name || "-"}</h2>
+                <p className="muted">
+                  Peminatan: {selectedSkripsiForAssign.peminatan?.name || "-"}
+                </p>
+              </div>
+            </div>
+
+            <div className="form-field">
+              <input
+                type="text"
+                placeholder="Cari nama dosen..."
+                value={dosenSearch}
+                onChange={(e) => setDosenSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="role-check-grid compact-check-grid" style={{ maxHeight: "50vh", overflowY: "auto" }}>
+              {dosenOptions
+                .filter((dosen: any) =>
+                  `${dosen.name} ${dosen.identifier}`
+                    .toLowerCase()
+                    .includes(dosenSearch.toLowerCase())
+                )
+                .map((dosen: any) => (
+                  <label key={dosen.id} className="role-check-item">
+                    <input
+                      type="checkbox"
+                      checked={getSelectedDosenIds(selectedSkripsiForAssign).includes(dosen.id)}
+                      onChange={() => toggleDosen(selectedSkripsiForAssign.id, dosen.id)}
+                    />
+                    <span>
+                      <strong>{dosen.name}</strong>
+                      <small>{dosen.identifier || dosen.email || "-"}</small>
+                    </span>
+                  </label>
+                ))}
+            </div>
+
+            <div className="form-actions" style={{ marginTop: "1rem" }}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setSelectedSkripsiForAssign(null)}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={assignMutation.isPending}
+                onClick={handleAssign}
+              >
+                {assignMutation.isPending ? "Menyimpan..." : "Simpan Pembimbing"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </DetailPanel>
     </section>
   );
 }

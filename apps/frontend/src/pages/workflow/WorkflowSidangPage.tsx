@@ -19,6 +19,7 @@ import {
   type WorkflowStage
 } from "../../services/workflow";
 import { getRuang } from "../../services/masterData";
+import { useAuth } from "../../auth/AuthContext";
 
 const WORKFLOW_TABS = [
   { label: "Semua", value: "ALL" },
@@ -215,6 +216,8 @@ function getActionButtonLabel(action: WorkflowAction) {
 
 export default function WorkflowSidangPage() {
   const queryClient = useQueryClient();
+  const { hasRole } = useAuth();
+  const isMahasiswa = hasRole("mahasiswa");
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -738,13 +741,214 @@ export default function WorkflowSidangPage() {
           disabled={actionMutation.isPending}
           onClick={() => actionMutation.mutate()}
         >
-          {actionMutation.isPending ? "Memproses..." : "Proses Aksi"}
+          {actionMutation.isPending ? "Memproses..." : "Unggah"}
         </button>
       </div>
     );
   }
 
+  function renderMahasiswaView() {
+    if (!selectedWorkflow) {
+      return (
+        <EmptyState
+          title="Tidak ada workflow aktif"
+          description="Anda belum memiliki workflow skripsi yang sedang berjalan."
+        />
+      );
+    }
 
+    const { skripsi, progressPercent, summaryStatus, nextStep, currentStage, currentStageLabel } = selectedWorkflow;
+
+    // Ordered stages for stepper
+    const stageOrder = ["SEMINAR_PROPOSAL", "BIMBINGAN", "SEMINAR_HASIL", "SIDANG_KOMPRE", "SIDANG_AKHIR"];
+    const orderedStages = [...selectedWorkflow.stages].sort((a, b) => {
+      const idxA = stageOrder.indexOf(a.key);
+      const idxB = stageOrder.indexOf(b.key);
+      return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
+    });
+
+    const activeStageKey = orderedStages.find(s => !s.isComplete)?.key || orderedStages[orderedStages.length - 1]?.key;
+    const currentDetailKey = detailActiveTab || activeStageKey;
+
+    const currentStageData = orderedStages.find((s) => s.key === currentDetailKey);
+
+    return (
+      <div className="page-stack">
+        {/* Hero Card */}
+        <div className="mhs-hero-card">
+          <div className="mhs-hero-grid">
+            <div className="mhs-hero-info">
+              <div className="mhs-hero-eyebrow">
+                {skripsi.peminatan?.name || "Skripsi"}
+              </div>
+              <h2>{skripsi.title || "Tanpa Judul"}</h2>
+              <div className="mhs-hero-sub">
+                Status saat ini: <strong>{formatStatus(summaryStatus)}</strong> di tahap <strong>{currentStageLabel}</strong>
+              </div>
+              {nextStep ? (
+                <div>
+                  <span className="mhs-hero-nextstep">
+                    <span className="material-symbols-outlined">arrow_forward</span>
+                    {nextStep}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+            <div className="mhs-hero-progress-ring">
+              <div className="mhs-ring-wrap">
+                <svg viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="44" className="mhs-ring-bg" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    className="mhs-ring-fg"
+                    style={{ strokeDasharray: 276.46, strokeDashoffset: 276.46 - (276.46 * progressPercent) / 100 }}
+                  />
+                </svg>
+                <div className="mhs-ring-label">{progressPercent}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Visual Stepper */}
+        <SectionCard className="workflow-timeline-card">
+          <div className="mhs-stepper">
+            {orderedStages.map((stage) => {
+              const isDone = stage.isComplete;
+              const isActive = !isDone && stage.status !== "BELUM_MULAI";
+              const statusClass = isDone ? "done" : (isActive ? "active" : "pending");
+
+              return (
+                <div
+                  key={stage.key}
+                  className={`mhs-stepper-step ${statusClass}`}
+                  onClick={() => setDetailActiveTab(stage.key)}
+                >
+                  <div className="mhs-stepper-node">
+                    {isDone ? (
+                      <span className="material-symbols-outlined">check</span>
+                    ) : isActive ? (
+                      <span className="material-symbols-outlined">radio_button_checked</span>
+                    ) : (
+                      <span className="material-symbols-outlined">circle</span>
+                    )}
+                  </div>
+                  <span className="mhs-stepper-label">{stage.label}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mhs-stage-cards">
+            {currentStageData ? (
+              <div className={`mhs-stage-card mhs-stage-open ${currentStageData.isComplete ? "mhs-stage-done" : (currentStageData.status !== "BELUM_MULAI" ? "mhs-stage-active" : "")}`}>
+                <div className="mhs-stage-card-header">
+                  <div className="mhs-stage-card-title">
+                    <div className="mhs-stage-icon">
+                      {getStageIcon(currentStageData)}
+                    </div>
+                    <div>
+                      <h3>{currentStageData.label}</h3>
+                      <p>{currentStageData.kind === "BIMBINGAN" ? "Tahap bimbingan" : (currentStageData.attemptNo ? `Attempt ${currentStageData.attemptNo}` : "Belum ada attempt")}</p>
+                    </div>
+                  </div>
+                  <div className="mhs-stage-card-badges">
+                    <StatusBadge value={currentStageData.status} size="sm" />
+                    {currentStageData.hasil ? <StatusBadge value={currentStageData.hasil} size="sm" /> : null}
+                  </div>
+                </div>
+
+                <div className="mhs-stage-card-body">
+                  <div className="mhs-stage-detail-grid">
+                    {currentStageData.kind === "SIDANG" ? (
+                      <>
+                        <div className="mhs-stage-detail-item">
+                          <label>Berkas Wajib</label>
+                          <span>{getBerkasLabel(currentStageData)}</span>
+                        </div>
+                        <div className="mhs-stage-detail-item">
+                          <label>Jadwal</label>
+                          <span>{getJadwalLabel(currentStageData)}</span>
+                        </div>
+                        <div className="mhs-stage-detail-item">
+                          <label>Penguji</label>
+                          <span>{getPengujiLabel(currentStageData)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mhs-stage-detail-item">
+                          <label>Bimbingan Valid</label>
+                          <span>{currentStageData.progress?.validCount ?? 0}/{currentStageData.progress?.requiredCount ?? 0}</span>
+                        </div>
+                        <div className="mhs-stage-detail-item">
+                          <label>Total Log</label>
+                          <span>{currentStageData.progress?.totalCount ?? 0}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {currentStageData.berkas?.length ? (
+                    <div className="mhs-stage-berkas-list">
+                      {currentStageData.berkas.map(berkas => (
+                        <div key={berkas.id} className="mhs-stage-berkas-item">
+                          <div>
+                            <strong>{formatStatus(berkas.kategori)}</strong>
+                            <span>{berkas.originalName || berkas.fileName}</span>
+                          </div>
+                          <FileDownloadButton berkasId={berkas.id} fileName={berkas.originalName || berkas.fileName || "berkas.pdf"} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {currentStageData.actions?.length ? (
+                    <div className="mhs-stage-actions">
+                      {currentStageData.actions.map((action, index) => (
+                        <button
+                          key={`${currentStageData.key}-${action.key}-${index}`}
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => openAction(action)}
+                        >
+                          {getActionButtonLabel(action)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+
+        {/* Action Sidebar for remaining actions not attached to the current stage directly, or generic workflow actions */}
+        {availableActions.length > 0 && (
+          <SectionCard title="Action Tersedia">
+            <div className="workflow-action-list" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {availableActions.map((action, index) => (
+                <button
+                  key={`${action.key}-${action.sidangId || action.skripsiId}-${index}`}
+                  type="button"
+                  className={`workflow-action-button ${selectedAction === action ? "active" : ""
+                    }`}
+                  style={{ width: 'auto', minWidth: '200px' }}
+                  onClick={() => openAction(action)}
+                >
+                  <span>{getActionBucket(action)}</span>
+                  <strong>{getActionButtonLabel(action)}</strong>
+                  <small>{getLatestActionTarget(action)}</small>
+                </button>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+      </div>
+    );
+  }
 
   const currentPage = workflowMeta.page || page;
   const currentLimit = workflowMeta.limit || limit;
@@ -872,22 +1076,24 @@ export default function WorkflowSidangPage() {
     <section className="page-stack">
       <PageHeader
         eyebrow="Workflow Akademik"
-        title="Workflow Sidang"
-        description="Kelola seluruh proses akademik dalam satu halaman: daftar workflow, action sesuai role, timeline tahap, dan detail sidang."
+        title={isMahasiswa ? "Workflow Skripsi Anda" : "Workflow Sidang"}
+        description={isMahasiswa ? "Pantau dan kelola proses skripsi Anda dari satu halaman." : "Kelola seluruh proses akademik dalam satu halaman: daftar workflow, action sesuai role, timeline tahap, dan detail sidang."}
       />
 
-      <div className="workflow-tabs workflow-tabs-global">
-        {WORKFLOW_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`workflow-tab ${stageFilter === tab.value ? "active" : ""}`}
-            onClick={() => setStageFilter(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {!isMahasiswa && (
+        <div className="workflow-tabs workflow-tabs-global">
+          {WORKFLOW_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              className={`workflow-tab ${stageFilter === tab.value ? "active" : ""}`}
+              onClick={() => setStageFilter(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {feedback ? (
         <div
@@ -899,325 +1105,341 @@ export default function WorkflowSidangPage() {
         </div>
       ) : null}
 
-      <SectionCard
-        title="Daftar Workflow"
-        description="Data sudah difilter oleh backend sesuai role. Gunakan pencarian dan filter untuk menemukan mahasiswa, tahap, atau status tertentu."
-        action={
-          <div className="workflow-v2-count">
-            <strong>{totalRows}</strong>
-            <span>data</span>
-          </div>
-        }
-        className="workflow-v2-card"
-      >
-        <FilterToolbar
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Judul, mahasiswa, NPM, email..."
-          meta={
-            <span>
-              Halaman <strong>{currentPage}</strong> dari{" "}
-              <strong>{totalPages}</strong>
-            </span>
-          }
-        >
-          <label className="filter-field">
-            <span>Tahap</span>
-            <select
-              value={stageFilter}
-              onChange={(event) => setStageFilter(event.target.value)}
-            >
-              <option value="ALL">Semua Tahap</option>
-              <option value="SEMINAR_PROPOSAL">Seminar Proposal</option>
-              <option value="BIMBINGAN">Bimbingan</option>
-              <option value="SEMINAR_HASIL">Seminar Hasil</option>
-              <option value="SIDANG_KOMPRE">Sidang Kompre</option>
-              <option value="SIDANG_AKHIR">Sidang Akhir</option>
-              <option value="SELESAI">Selesai</option>
-            </select>
-          </label>
-
-          <label className="filter-field">
-            <span>Status</span>
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="ALL">Semua Status</option>
-              <option value="MENUNGGU_BERKAS">Menunggu Berkas</option>
-              <option value="MENUNGGU_PENGUJI">Menunggu Penguji</option>
-              <option value="MENUNGGU_JADWAL">Menunggu Jadwal</option>
-              <option value="DIJADWALKAN">Dijadwalkan</option>
-              <option value="MENUNGGU_NILAI">Menunggu Nilai</option>
-              <option value="MENUNGGU_KEPUTUSAN">Menunggu Keputusan</option>
-              <option value="MENUNGGU_REVISI">Menunggu Revisi</option>
-              <option value="SELESAI">Selesai</option>
-              <option value="LULUS_SKRIPSI">Lulus Skripsi</option>
-              <option value="TIDAK_LULUS_SKRIPSI">Tidak Lulus Skripsi</option>
-            </select>
-          </label>
-        </FilterToolbar>
-
-        <DataTable
-          data={workflows}
-          columns={workflowTableColumns}
-          emptyMessage="Belum ada workflow"
-          getRowKey={(workflow) => workflow.skripsi.id}
-          isLoading={workflowQuery.isLoading}
-          loadingMessage="Memuat workflow..."
-          minWidth={980}
-          mobileTitle={(workflow) => workflow.skripsi.mahasiswa?.name || "-"}
-          mobileSubtitle={(workflow) => getWorkflowTitle(workflow)}
-          mobileMeta={(workflow) => (
-            <StatusBadge value={workflow.summaryStatus} size="sm" />
-          )}
-          pagination={{
-            page: currentPage,
-            pageSize: currentLimit,
-            total: totalRows,
-            onPageChange: setPage,
-            onPageSizeChange: (nextLimit) => {
-              setLimit(nextLimit);
-              setPage(1);
-            },
-            itemLabel: "workflow"
-          }}
-        />
-      </SectionCard>
-
-      {!selectedWorkflow ? (
-        <SectionCard>
-          <EmptyState
-            title="Pilih workflow"
-            description="Pilih salah satu data pada tabel untuk melihat detail timeline dan action."
-          />
-        </SectionCard>
+      {isMahasiswa ? (
+        selectedWorkflow ? renderMahasiswaView() : (
+          <SectionCard>
+            {workflowQuery.isLoading ? (
+              <EmptyState title="Memuat data..." description="Mohon tunggu sebentar." />
+            ) : (
+              <EmptyState title="Belum ada skripsi" description="Anda belum terdaftar dalam workflow skripsi." />
+            )}
+          </SectionCard>
+        )
       ) : (
-        <div className="workflow-detail-grid-v2 workflow-detail-grid-polished">
-          <div className="workflow-detail-main">
-            <SectionCard className="workflow-summary-card">
-              <div className="workflow-summary-head">
-                <div>
-                  <p className="eyebrow">{getWorkflowSubtitle(selectedWorkflow)}</p>
-                  <h2>{getWorkflowTitle(selectedWorkflow)}</h2>
-                  <p className="muted">{selectedWorkflow.nextStep}</p>
-                </div>
-
-                <div className="workflow-summary-status">
-                  <StatusBadge value={selectedWorkflow.summaryStatus} />
-                  <strong>{selectedWorkflow.progressPercent}%</strong>
-                </div>
+        <>
+          <SectionCard
+            title="Daftar Workflow"
+            description="Data sudah difilter oleh backend sesuai role. Gunakan pencarian dan filter untuk menemukan mahasiswa, tahap, atau status tertentu."
+            action={
+              <div className="workflow-v2-count">
+                <strong>{totalRows}</strong>
+                <span>data</span>
               </div>
-
-              <div className="workflow-progress-track">
-                <span
-                  style={{
-                    width: `${selectedWorkflow.progressPercent}%`
-                  }}
-                />
-              </div>
-            </SectionCard>
-
-            <SectionCard
-              title="Timeline Workflow"
-              description="Tahap utama ditampilkan berurutan dari Seminar Proposal sampai Sidang Akhir."
-              className="workflow-timeline-card"
+            }
+            className="workflow-v2-card"
+          >
+            <FilterToolbar
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Judul, mahasiswa, NPM, email..."
+              meta={
+                <span>
+                  Halaman <strong>{currentPage}</strong> dari{" "}
+                  <strong>{totalPages}</strong>
+                </span>
+              }
             >
-              <div className="workflow-detail-tabs">
-                {selectedWorkflow.stages.map((stage) => (
-                  <button
-                    key={stage.key}
-                    type="button"
-                    className={`workflow-detail-tab ${detailActiveTab === stage.key ? "active" : ""
-                      } ${stage.isComplete ? "completed" : ""}`}
-                    onClick={() => setDetailActiveTab(stage.key)}
-                  >
-                    <span className="tab-icon">{getStageIcon(stage)}</span>
-                    <span className="tab-label">{stage.label}</span>
-                  </button>
-                ))}
-              </div>
+              <label className="filter-field">
+                <span>Tahap</span>
+                <select
+                  value={stageFilter}
+                  onChange={(event) => setStageFilter(event.target.value)}
+                >
+                  <option value="ALL">Semua Tahap</option>
+                  <option value="SEMINAR_PROPOSAL">Seminar Proposal</option>
+                  <option value="BIMBINGAN">Bimbingan</option>
+                  <option value="SEMINAR_HASIL">Seminar Hasil</option>
+                  <option value="SIDANG_KOMPRE">Sidang Kompre</option>
+                  <option value="SIDANG_AKHIR">Sidang Akhir</option>
+                  <option value="SELESAI">Selesai</option>
+                </select>
+              </label>
 
-              <div className="workflow-stage-list">
-                {selectedWorkflow.stages
-                  .filter((stage) => stage.key === detailActiveTab)
-                  .map((stage) => (
-                    <article key={stage.key} className="workflow-stage-card">
-                      <div className="workflow-stage-icon">{getStageIcon(stage)}</div>
+              <label className="filter-field">
+                <span>Status</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="MENUNGGU_BERKAS">Menunggu Berkas</option>
+                  <option value="MENUNGGU_PENGUJI">Menunggu Penguji</option>
+                  <option value="MENUNGGU_JADWAL">Menunggu Jadwal</option>
+                  <option value="DIJADWALKAN">Dijadwalkan</option>
+                  <option value="MENUNGGU_NILAI">Menunggu Nilai</option>
+                  <option value="MENUNGGU_KEPUTUSAN">Menunggu Keputusan</option>
+                  <option value="MENUNGGU_REVISI">Menunggu Revisi</option>
+                  <option value="SELESAI">Selesai</option>
+                  <option value="LULUS_SKRIPSI">Lulus Skripsi</option>
+                  <option value="TIDAK_LULUS_SKRIPSI">Tidak Lulus Skripsi</option>
+                </select>
+              </label>
+            </FilterToolbar>
 
-                      <div className="workflow-stage-body">
-                        <div className="workflow-stage-head">
-                          <div>
-                            <h3>{stage.label}</h3>
-                            <p className="muted">
-                              {stage.attemptNo
-                                ? `Attempt ${stage.attemptNo}`
-                                : stage.kind === "BIMBINGAN"
-                                  ? "Tahap bimbingan"
-                                  : "Belum ada attempt"}
-                            </p>
-                          </div>
-
-                          <div className="workflow-stage-badges">
-                            <StatusBadge value={stage.status} size="sm" />
-                            {stage.hasil ? (
-                              <StatusBadge value={stage.hasil} size="sm" />
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="workflow-stage-meta">
-                          {stage.kind === "SIDANG" ? (
-                            <>
-                              <span>Berkas: {getBerkasLabel(stage)}</span>
-                              <span>Penguji: {getPengujiLabel(stage)}</span>
-                              <span>Jadwal: {getJadwalLabel(stage)}</span>
-                              {stage.requiresNilai ? (
-                                <span>
-                                  Nilai:{" "}
-                                  {stage.nilaiCount ?? stage.nilai?.length ?? 0}{" "}
-                                  input
-                                </span>
-                              ) : null}
-                              {stage.key === "SEMINAR_HASIL" &&
-                                stage.hasil === "REVISI" ? (
-                                <span>
-                                  Revisi:{" "}
-                                  {formatStatus(
-                                    stage.latestRevisi?.status ||
-                                    "MENUNGGU_DIAJUKAN"
-                                  )}
-                                </span>
-                              ) : null}
-                            </>
-                          ) : (
-                            <>
-                              <span>
-                                Bimbingan valid: {stage.progress?.validCount ?? 0}/
-                                {stage.progress?.requiredCount ?? 0}
-                              </span>
-                              <span>
-                                Total log: {stage.progress?.totalCount ?? 0}
-                              </span>
-                              <span>
-                                Pembimbing: {stage.pembimbing?.length ?? 0}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {stage.missingBerkas?.length ? (
-                          <div className="workflow-chip-row">
-                            {stage.missingBerkas.map((kategori) => (
-                              <span key={kategori} className="workflow-chip">
-                                Kurang {formatStatus(kategori)}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {stage.berkas?.length ? (
-                          <div className="workflow-mini-list">
-                            {stage.berkas.map((berkas) => (
-                              <div key={berkas.id} className="workflow-mini-row">
-                                <div>
-                                  <strong>{formatStatus(berkas.kategori)}</strong>
-                                  <span>
-                                    {berkas.originalName || berkas.fileName || "Berkas"}
-                                  </span>
-                                </div>
-                                <FileDownloadButton
-                                  berkasId={berkas.id}
-                                  fileName={berkas.originalName || berkas.fileName || "berkas.pdf"}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {stage.revisi?.length ? (
-                          <div className="workflow-mini-list">
-                            {stage.revisi.map((revisi) => (
-                              <div key={revisi.id} className="workflow-mini-row">
-                                <div>
-                                  <strong>Revisi Seminar Hasil</strong>
-                                  <span>
-                                    {formatStatus(revisi.status || "-")}
-                                    {revisi.berkas?.originalName
-                                      ? ` • ${revisi.berkas.originalName}`
-                                      : ""}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {stage.penguji?.length ? (
-                          <div className="workflow-mini-list">
-                            {stage.penguji.map((item) => (
-                              <div key={item.id} className="workflow-mini-row">
-                                <div>
-                                  <strong>{item.dosen?.name || item.dosenId}</strong>
-                                  <span>{formatStatus(item.peran)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {stage.actions?.length ? (
-                          <ActionGroup compact>
-                            {stage.actions.map((action, index) => (
-                              <button
-                                key={`${stage.key}-${action.key}-${index}`}
-                                type="button"
-                                className="secondary-button"
-                                onClick={() => openAction(action)}
-                              >
-                                {getActionButtonLabel(action)}
-                              </button>
-                            ))}
-                          </ActionGroup>
-                        ) : null}
-                      </div>
-                    </article>
-                  ))}
-              </div>
-            </SectionCard>
-          </div>
-
-          <aside className="workflow-action-sidebar">
-            <SectionCard
-              title="Action Sesuai Role"
-              description="Action dikirim dari backend sesuai role dan status tahap."
-              className="workflow-actions-card"
-            >
-              {availableActions.length === 0 ? (
-                <EmptyState
-                  title="Tidak ada action saat ini"
-                  description="Tahap sedang menunggu role lain atau sudah selesai."
-                />
-              ) : (
-                <div className="workflow-action-list">
-                  {availableActions.map((action, index) => (
-                    <button
-                      key={`${action.key}-${action.sidangId || action.skripsiId}-${index}`}
-                      type="button"
-                      className={`workflow-action-button ${selectedAction === action ? "active" : ""
-                        }`}
-                      onClick={() => openAction(action)}
-                    >
-                      <span>{getActionBucket(action)}</span>
-                      <strong>{getActionButtonLabel(action)}</strong>
-                      <small>{getLatestActionTarget(action)}</small>
-                    </button>
-                  ))}
-                </div>
+            <DataTable
+              data={workflows}
+              columns={workflowTableColumns}
+              emptyMessage="Belum ada workflow"
+              getRowKey={(workflow) => workflow.skripsi.id}
+              isLoading={workflowQuery.isLoading}
+              loadingMessage="Memuat workflow..."
+              minWidth={980}
+              mobileTitle={(workflow) => workflow.skripsi.mahasiswa?.name || "-"}
+              mobileSubtitle={(workflow) => getWorkflowTitle(workflow)}
+              mobileMeta={(workflow) => (
+                <StatusBadge value={workflow.summaryStatus} size="sm" />
               )}
+              pagination={{
+                page: currentPage,
+                pageSize: currentLimit,
+                total: totalRows,
+                onPageChange: setPage,
+                onPageSizeChange: (nextLimit) => {
+                  setLimit(nextLimit);
+                  setPage(1);
+                },
+                itemLabel: "workflow"
+              }}
+            />
+          </SectionCard>
+
+          {!selectedWorkflow ? (
+            <SectionCard>
+              <EmptyState
+                title="Pilih workflow"
+                description="Pilih salah satu data pada tabel untuk melihat detail timeline dan action."
+              />
             </SectionCard>
-          </aside>
-        </div>
+          ) : (
+            <div className="workflow-detail-grid-v2">
+              <div className="workflow-detail-main">
+                <div className="workflow-v2-card">
+                  <SectionCard className="workflow-summary-card">
+                    <div className="workflow-summary-head">
+                      <div>
+                        <p className="eyebrow">{getWorkflowSubtitle(selectedWorkflow)}</p>
+                        <h2>{getWorkflowTitle(selectedWorkflow)}</h2>
+                        <p className="muted">{selectedWorkflow.nextStep}</p>
+                      </div>
+
+                      <div className="workflow-summary-status">
+                        <StatusBadge value={selectedWorkflow.summaryStatus} />
+                        <strong>{selectedWorkflow.progressPercent}%</strong>
+                      </div>
+                    </div>
+
+                    <div className="workflow-progress-track">
+                      <span
+                        style={{
+                          width: `${selectedWorkflow.progressPercent}%`
+                        }}
+                      />
+                    </div>
+                  </SectionCard>
+
+                  <SectionCard
+                    title="Timeline Workflow"
+                    description="Tahap utama ditampilkan berurutan dari Seminar Proposal sampai Sidang Akhir."
+                    className="workflow-timeline-card"
+                  >
+                    <div className="workflow-detail-tabs">
+                      {selectedWorkflow.stages.map((stage) => (
+                        <button
+                          key={stage.key}
+                          type="button"
+                          className={`workflow-detail-tab ${detailActiveTab === stage.key ? "active" : ""
+                            } ${stage.isComplete ? "completed" : ""}`}
+                          onClick={() => setDetailActiveTab(stage.key)}
+                        >
+                          <span className="tab-icon">{getStageIcon(stage)}</span>
+                          <span className="tab-label">{stage.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="workflow-stage-list">
+                      {selectedWorkflow.stages
+                        .filter((stage) => stage.key === detailActiveTab)
+                        .map((stage) => (
+                          <article key={stage.key} className="workflow-stage-card">
+                            <div className="workflow-stage-icon">{getStageIcon(stage)}</div>
+
+                            <div className="workflow-stage-body">
+                              <div className="workflow-stage-head">
+                                <div>
+                                  <h3>{stage.label}</h3>
+                                  <p className="muted">
+                                    {stage.attemptNo
+                                      ? `Attempt ${stage.attemptNo}`
+                                      : stage.kind === "BIMBINGAN"
+                                        ? "Tahap bimbingan"
+                                        : "Belum ada attempt"}
+                                  </p>
+                                </div>
+
+                                <div className="workflow-stage-badges">
+                                  <StatusBadge value={stage.status} size="sm" />
+                                  {stage.hasil ? (
+                                    <StatusBadge value={stage.hasil} size="sm" />
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="workflow-stage-meta">
+                                {stage.kind === "SIDANG" ? (
+                                  <>
+                                    <span>Berkas: {getBerkasLabel(stage)}</span>
+                                    <span>Penguji: {getPengujiLabel(stage)}</span>
+                                    <span>Jadwal: {getJadwalLabel(stage)}</span>
+                                    {stage.requiresNilai ? (
+                                      <span>
+                                        Nilai:{" "}
+                                        {stage.nilaiCount ?? stage.nilai?.length ?? 0}{" "}
+                                        input
+                                      </span>
+                                    ) : null}
+                                    {stage.key === "SEMINAR_HASIL" &&
+                                      stage.hasil === "REVISI" ? (
+                                      <span>
+                                        Revisi:{" "}
+                                        {formatStatus(
+                                          stage.latestRevisi?.status ||
+                                          "MENUNGGU_DIAJUKAN"
+                                        )}
+                                      </span>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>
+                                      Bimbingan valid: {stage.progress?.validCount ?? 0}/
+                                      {stage.progress?.requiredCount ?? 0}
+                                    </span>
+                                    <span>
+                                      Total log: {stage.progress?.totalCount ?? 0}
+                                    </span>
+                                    <span>
+                                      Pembimbing: {stage.pembimbing?.length ?? 0}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+
+                              {stage.missingBerkas?.length ? (
+                                <div className="workflow-chip-row">
+                                  {stage.missingBerkas.map((kategori) => (
+                                    <span key={kategori} className="workflow-chip">
+                                      Kurang {formatStatus(kategori)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              {stage.berkas?.length ? (
+                                <div className="workflow-mini-list">
+                                  {stage.berkas.map((berkas) => (
+                                    <div key={berkas.id} className="workflow-mini-row">
+                                      <div>
+                                        <strong>{formatStatus(berkas.kategori)}</strong>
+                                        <span>
+                                          {berkas.originalName || berkas.fileName || "Berkas"}
+                                        </span>
+                                      </div>
+                                      <FileDownloadButton
+                                        berkasId={berkas.id}
+                                        fileName={berkas.originalName || berkas.fileName || "berkas.pdf"}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              {stage.revisi?.length ? (
+                                <div className="workflow-mini-list">
+                                  {stage.revisi.map((revisi) => (
+                                    <div key={revisi.id} className="workflow-mini-row">
+                                      <div>
+                                        <strong>Revisi Seminar Hasil</strong>
+                                        <span>
+                                          {formatStatus(revisi.status || "-")}
+                                          {revisi.berkas?.originalName
+                                            ? ` • ${revisi.berkas.originalName}`
+                                            : ""}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              {stage.penguji?.length ? (
+                                <div className="workflow-mini-list">
+                                  {stage.penguji.map((item) => (
+                                    <div key={item.id} className="workflow-mini-row">
+                                      <div>
+                                        <strong>{item.dosen?.name || item.dosenId}</strong>
+                                        <span>{formatStatus(item.peran)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              {stage.actions?.length ? (
+                                <ActionGroup compact>
+                                  {stage.actions.map((action, index) => (
+                                    <button
+                                      key={`${stage.key}-${action.key}-${index}`}
+                                      type="button"
+                                      className="secondary-button"
+                                      onClick={() => openAction(action)}
+                                    >
+                                      {getActionButtonLabel(action)}
+                                    </button>
+                                  ))}
+                                </ActionGroup>
+                              ) : null}
+                            </div>
+                          </article>
+                        ))}
+                    </div>
+                  </SectionCard>
+                </div>
+              </div>
+
+              <aside className="workflow-action-sidebar">
+                <SectionCard
+                  title="Action Sesuai Role"
+                  description="Action dikirim dari backend sesuai role dan status tahap."
+                  className="workflow-actions-card"
+                >
+                  {availableActions.length === 0 ? (
+                    <EmptyState
+                      title="Tidak ada action saat ini"
+                      description="Tahap sedang menunggu role lain atau sudah selesai."
+                    />
+                  ) : (
+                    <div className="workflow-action-list">
+                      {availableActions.map((action, index) => (
+                        <button
+                          key={`${action.key}-${action.sidangId || action.skripsiId}-${index}`}
+                          type="button"
+                          className={`workflow-action-button ${selectedAction === action ? "active" : ""
+                            }`}
+                          onClick={() => openAction(action)}
+                        >
+                          <span>{getActionBucket(action)}</span>
+                          <strong>{getActionButtonLabel(action)}</strong>
+                          <small>{getLatestActionTarget(action)}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+              </aside>
+            </div>
+          )}
+        </>
       )}
 
       <DetailPanel

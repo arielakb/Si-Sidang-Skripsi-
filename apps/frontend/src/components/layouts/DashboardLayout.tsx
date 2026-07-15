@@ -98,7 +98,7 @@ const menuItems: MenuItem[] = [
     label: "Master Data",
     to: "/app/master-data",
     icon: "dataset",
-    roles: ["admin", "dosen_koordinator", "ketua_prodi", "staf_prodi"],
+    roles: ["admin", "staf_prodi"],
     permissions: ["master_data.read"]
   },
   {
@@ -106,7 +106,7 @@ const menuItems: MenuItem[] = [
     label: "Laporan",
     to: "/app/laporan",
     icon: "analytics",
-    roles: ["admin", "dosen_koordinator", "ketua_prodi"],
+    roles: ["admin", "ketua_prodi"],
     permissions: ["laporan.read"]
   },
   {
@@ -122,7 +122,7 @@ const menuItems: MenuItem[] = [
     label: "Audit Log",
     to: "/app/audit-logs",
     icon: "manage_search",
-    roles: ["admin", "ketua_prodi"],
+    roles: ["admin"],
     permissions: ["audit.read"]
   },
   {

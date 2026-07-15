@@ -669,7 +669,7 @@ function buildSidangActions({
     mahasiswaOwner
   ) {
     const hasFinalBerkas = skripsi.berkas?.some(
-      (b) => b.kategori === "BERKAS_FINAL" || b.kategori === "REVISI_AKHIR"
+      (b) => b.kategori === "FINAL_SKRIPSI" || b.kategori === "REVISI_SIDANG"
     );
 
     if (!hasFinalBerkas) {
@@ -681,7 +681,7 @@ function buildSidangActions({
           sidangId: sidang.id,
           skripsiId: skripsi.id,
           jenis,
-          kategori: "BERKAS_FINAL"
+          kategori: "FINAL_SKRIPSI"
         })
       );
     }

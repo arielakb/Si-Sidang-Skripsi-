@@ -16,7 +16,7 @@ import {
 } from "./sidang.controller.js";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { requirePermission } from "../../middlewares/require-permission.js";
-import { uploadPdf, uploadToSupabase } from "../../middlewares/upload/file-upload.js";
+import { uploadPdf, processLocalUpload } from "../../middlewares/upload/file-upload.js";
 
 const router = Router();
 
@@ -81,7 +81,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
-  uploadToSupabase,
+  processLocalUpload,
   uploadRevisiSeminarHasilSidang
 );
 
@@ -97,7 +97,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
-  uploadToSupabase,
+  processLocalUpload,
   uploadBerkasSidang
 );
 
@@ -106,7 +106,7 @@ router.post(
   authenticate,
   requirePermission("sidang.upload_surat"),
   uploadPdf.single("file"),
-  uploadToSupabase,
+  processLocalUpload,
   uploadSuratPerjanjianSidang
 );
 
@@ -115,7 +115,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
-  uploadToSupabase,
+  processLocalUpload,
   uploadBerkasFinalSidang
 );
 

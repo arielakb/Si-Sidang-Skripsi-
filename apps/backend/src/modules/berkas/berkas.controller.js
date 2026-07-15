@@ -75,9 +75,21 @@ export async function downloadBerkas(req, res, next) {
       });
     }
 
-    const absolutePath = resolveFilePath(berkas.path);
+    const localUploadsDir = path.join(process.cwd(), "uploads", "berkas");
+    const potentialLocalPath = path.join(localUploadsDir, berkas.fileName);
+
+    let absolutePath;
+    if (fs.existsSync(potentialLocalPath)) {
+      absolutePath = potentialLocalPath;
+    } else if (berkas.path && !berkas.path.startsWith("http")) {
+      absolutePath = resolveFilePath(berkas.path);
+    }
 
     if (!absolutePath || !fs.existsSync(absolutePath)) {
+      if (berkas.path && berkas.path.startsWith("http")) {
+        // Fallback: Redirect if it's an external URL (Supabase, mock, etc) and not found locally
+        return res.redirect(berkas.path);
+      }
       return res.status(404).json({
         success: false,
         message: "File fisik tidak ditemukan di server"

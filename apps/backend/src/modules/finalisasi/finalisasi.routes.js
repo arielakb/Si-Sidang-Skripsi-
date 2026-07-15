@@ -9,7 +9,7 @@ import {
 } from "./finalisasi.controller.js";
 import { authenticate } from "../../middlewares/authenticate.js";
 import { requirePermission } from "../../middlewares/require-permission.js";
-import { uploadPdf, uploadToSupabase } from "../../middlewares/upload/file-upload.js";
+import { uploadPdf, processLocalUpload } from "../../middlewares/upload/file-upload.js";
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
-  uploadToSupabase,
+  processLocalUpload,
   uploadFinalSkripsi
 );
 
@@ -27,7 +27,7 @@ router.post(
   authenticate,
   requirePermission("berkas.upload"),
   uploadPdf.single("file"),
-  uploadToSupabase,
+  processLocalUpload,
   uploadLembarPengesahan
 );
 

@@ -15,6 +15,7 @@ import {
   type WorkflowListResponse,
   type WorkflowStage
 } from "../../services/workflow";
+import { useAuth } from "../../auth/AuthContext";
 
 const stageOptions = [
   { value: "SEMINAR_PROPOSAL", label: "Seminar Proposal" },
@@ -206,6 +207,9 @@ function WorkflowHistoryCardItem({ workflow }: { workflow: WorkflowItem }) {
 }
 
 export default function MyProgressPage() {
+  const { hasRole } = useAuth();
+  const isMahasiswa = hasRole("mahasiswa");
+
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState("");
   const [status, setStatus] = useState("");
@@ -265,34 +269,36 @@ export default function MyProgressPage() {
         }
       />
 
-      <div className="workflow-tabs workflow-tabs-global">
-        <button
-          type="button"
-          className={`workflow-tab ${stage === "" ? "active" : ""}`}
-          onClick={() => {
-            setStage("");
-            setPage(1);
-          }}
-        >
-          Semua Tahap
-        </button>
-        {stageOptions.map((option) => (
+      {!isMahasiswa && (
+        <div className="workflow-tabs workflow-tabs-global">
           <button
-            key={option.value}
             type="button"
-            className={`workflow-tab ${stage === option.value ? "active" : ""}`}
+            className={`workflow-tab ${stage === "" ? "active" : ""}`}
             onClick={() => {
-              setStage(option.value);
+              setStage("");
               setPage(1);
             }}
           >
-            {option.label}
+            Semua Tahap
           </button>
-        ))}
-      </div>
+          {stageOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`workflow-tab ${stage === option.value ? "active" : ""}`}
+              onClick={() => {
+                setStage(option.value);
+                setPage(1);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="metric-grid">
-        {metrics.map((metric) => (
+        {(isMahasiswa ? metrics.slice(0, 3) : metrics).map((metric) => (
           <MetricCard
             key={metric.label}
             label={metric.label}
@@ -302,118 +308,120 @@ export default function MyProgressPage() {
         ))}
       </div>
 
-      <SectionCard
-        title="Daftar Progress"
-        description="Gunakan filter untuk memantau progress berdasarkan mahasiswa, tahap, atau status."
-      >
-        <DataTable<WorkflowItem>
-          data={rows}
-          toolbar={
-            <FilterToolbar
-              searchValue={search}
-              onSearchChange={setSearch}
-              searchPlaceholder="Cari mahasiswa, NPM, judul..."
-            >
-              <div className="filter-field">
-                <label>Status</label>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                >
-                  <option value="">Semua status</option>
-                  <option value="MENUNGGU_BERKAS">Menunggu Berkas</option>
-                  <option value="MENUNGGU_PENGUJI">Menunggu Penguji</option>
-                  <option value="MENUNGGU_JADWAL">Menunggu Jadwal</option>
-                  <option value="MENUNGGU_NILAI">Menunggu Nilai</option>
-                  <option value="MENUNGGU_KEPUTUSAN">Menunggu Keputusan</option>
-                  <option value="MENUNGGU_REVISI">Menunggu Revisi</option>
-                  <option value="LULUS_SKRIPSI">Lulus Skripsi</option>
-                  <option value="TIDAK_LULUS_SKRIPSI">Tidak Lulus Skripsi</option>
-                </select>
-              </div>
-            </FilterToolbar>
-          }
-          columns={[
-            {
-              key: "mahasiswa",
-              header: "Mahasiswa",
-              mobilePriority: "title",
-              render: (item) => (
-                <div className="table-title-cell">
-                  <strong>{item.skripsi.mahasiswa?.name || "-"}</strong>
-                  <span>{item.skripsi.mahasiswa?.identifier || "-"}</span>
+      {!isMahasiswa ? (
+        <SectionCard
+          title="Daftar Progress"
+          description="Gunakan filter untuk memantau progress berdasarkan mahasiswa, tahap, atau status."
+        >
+          <DataTable<WorkflowItem>
+            data={rows}
+            toolbar={
+              <FilterToolbar
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Cari mahasiswa, NPM, judul..."
+              >
+                <div className="filter-field">
+                  <label>Status</label>
+                  <select
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value)}
+                  >
+                    <option value="">Semua status</option>
+                    <option value="MENUNGGU_BERKAS">Menunggu Berkas</option>
+                    <option value="MENUNGGU_PENGUJI">Menunggu Penguji</option>
+                    <option value="MENUNGGU_JADWAL">Menunggu Jadwal</option>
+                    <option value="MENUNGGU_NILAI">Menunggu Nilai</option>
+                    <option value="MENUNGGU_KEPUTUSAN">Menunggu Keputusan</option>
+                    <option value="MENUNGGU_REVISI">Menunggu Revisi</option>
+                    <option value="LULUS_SKRIPSI">Lulus Skripsi</option>
+                    <option value="TIDAK_LULUS_SKRIPSI">Tidak Lulus Skripsi</option>
+                  </select>
                 </div>
-              )
-            },
-            {
-              key: "judul",
-              header: "Judul",
-              render: (item) => item.skripsi.title || "Tanpa judul"
-            },
-            {
-              key: "tahap",
-              header: "Tahap",
-              render: (item) => item.currentStageLabel
-            },
-            {
-              key: "bimbingan",
-              header: "Bimbingan",
-              align: "center",
-              render: (item) => getBimbinganLabel(item)
-            },
-            {
-              key: "progress",
-              header: "Progress",
-              align: "center",
-              render: (item) => (
-                <div className="progress-table-cell">
-                  <strong>{item.progressPercent}%</strong>
-                  <div className="workflow-progress-track">
-                    <span style={{ width: `${item.progressPercent}%` }} />
-                  </div>
-                </div>
-              )
-            },
-            {
-              key: "status",
-              header: "Status",
-              align: "center",
-              mobilePriority: "meta",
-              render: (item) => (
-                <StatusBadge
-                  value={getFinalStatus(item) || item.summaryStatus}
-                  size="sm"
-                />
-              )
-            },
-            {
-              key: "next",
-              header: "Langkah Berikutnya",
-              render: (item) => item.nextStep || "-"
+              </FilterToolbar>
             }
-          ]}
-          getRowKey={(item) => item.skripsi.id}
-          emptyMessage="Belum ada progress sesuai filter"
-          isLoading={workflowQuery.isLoading}
-          minWidth={1080}
-          pagination={{
-            page: meta.page,
-            pageSize: meta.limit,
-            total: meta.total,
-            onPageChange: setPage,
-            onPageSizeChange: setLimit,
-            itemLabel: "progress"
-          }}
-          mobileSubtitle={(item) => item.skripsi.title || "Tanpa judul"}
-          mobileMeta={(item) => (
-            <StatusBadge value={getFinalStatus(item) || item.summaryStatus} size="sm" />
-          )}
-        />
-      </SectionCard>
+            columns={[
+              {
+                key: "mahasiswa",
+                header: "Mahasiswa",
+                mobilePriority: "title",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{item.skripsi.mahasiswa?.name || "-"}</strong>
+                    <span>{item.skripsi.mahasiswa?.identifier || "-"}</span>
+                  </div>
+                )
+              },
+              {
+                key: "judul",
+                header: "Judul",
+                render: (item) => item.skripsi.title || "Tanpa judul"
+              },
+              {
+                key: "tahap",
+                header: "Tahap",
+                render: (item) => item.currentStageLabel
+              },
+              {
+                key: "bimbingan",
+                header: "Bimbingan",
+                align: "center",
+                render: (item) => getBimbinganLabel(item)
+              },
+              {
+                key: "progress",
+                header: "Progress",
+                align: "center",
+                render: (item) => (
+                  <div className="progress-table-cell">
+                    <strong>{item.progressPercent}%</strong>
+                    <div className="workflow-progress-track">
+                      <span style={{ width: `${item.progressPercent}%` }} />
+                    </div>
+                  </div>
+                )
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                mobilePriority: "meta",
+                render: (item) => (
+                  <StatusBadge
+                    value={getFinalStatus(item) || item.summaryStatus}
+                    size="sm"
+                  />
+                )
+              },
+              {
+                key: "next",
+                header: "Langkah Berikutnya",
+                render: (item) => item.nextStep || "-"
+              }
+            ]}
+            getRowKey={(item) => item.skripsi.id}
+            emptyMessage="Belum ada progress sesuai filter"
+            isLoading={workflowQuery.isLoading}
+            minWidth={1080}
+            pagination={{
+              page: meta.page,
+              pageSize: meta.limit,
+              total: meta.total,
+              onPageChange: setPage,
+              onPageSizeChange: setLimit,
+              itemLabel: "progress"
+            }}
+            mobileSubtitle={(item) => item.skripsi.title || "Tanpa judul"}
+            mobileMeta={(item) => (
+              <StatusBadge value={getFinalStatus(item) || item.summaryStatus} size="sm" />
+            )}
+          />
+        </SectionCard>
+      ) : null}
 
       <SectionCard
-        title="Timeline Ringkas"
-        description="Tahap setiap skripsi yang tampil di halaman ini."
+        title={isMahasiswa ? "Timeline Progress Skripsi Anda" : "Timeline Ringkas"}
+        description={isMahasiswa ? "Urutan tahap dari awal hingga akhir." : "Tahap setiap skripsi yang tampil di halaman ini."}
       >
         {workflowQuery.isLoading ? (
           <EmptyState title="Memuat timeline..." description="Mohon tunggu sebentar." />
@@ -423,14 +431,47 @@ export default function MyProgressPage() {
             description="Timeline akan muncul setelah data workflow tersedia."
           />
         ) : (
-          <div className="workflow-history-list">
-            {rows.map((workflow) => (
-              <WorkflowHistoryCardItem
-                key={workflow.skripsi.id}
-                workflow={workflow}
-              />
-            ))}
-          </div>
+          isMahasiswa ? (
+            <div className="mhs-timeline">
+              {getSortedStages(rows[0]).map((stage) => {
+                const isDone = stage.isComplete;
+                const isActive = !isDone && stage.status !== "BELUM_MULAI";
+                const statusClass = isDone ? "done" : (isActive ? "active" : "pending");
+                
+                return (
+                  <div key={stage.key} className={`mhs-timeline-node ${statusClass}`}>
+                    <div className="mhs-timeline-dot">
+                      {isDone ? (
+                        <span className="material-symbols-outlined">check</span>
+                      ) : isActive ? (
+                        <span className="material-symbols-outlined">radio_button_checked</span>
+                      ) : (
+                        <span className="material-symbols-outlined">circle</span>
+                      )}
+                    </div>
+                    <div className="mhs-timeline-content">
+                      <div className="mhs-timeline-head">
+                        <h3>{stage.label}</h3>
+                        <StatusBadge value={isDone ? (stage.hasil || "SELESAI") : stage.status} size="sm" />
+                      </div>
+                      <div className="mhs-timeline-desc">
+                        {getStageDescription(stage)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="workflow-history-list">
+              {rows.map((workflow) => (
+                <WorkflowHistoryCardItem
+                  key={workflow.skripsi.id}
+                  workflow={workflow}
+                />
+              ))}
+            </div>
+          )
         )}
       </SectionCard>
     </section>

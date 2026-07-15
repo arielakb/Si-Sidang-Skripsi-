@@ -2724,3 +2724,716 @@ textarea:focus {
 .workflow-detail-tab .tab-icon {
   font-size: 0.9rem;
 }
+
+/* ================================================
+   MAHASISWA — Hero Progress Card
+   ================================================ */
+
+.mhs-hero-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  padding: 2rem 2.2rem;
+  background-color: #06224a;
+  background-image:
+    radial-gradient(ellipse at top right, rgba(245, 197, 66, 0.18), transparent 55%),
+    linear-gradient(135deg, #06224a 0%, #064b9b 50%, #0b5fc0 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(6, 34, 74, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.mhs-hero-card .mhs-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2rem;
+  align-items: center;
+}
+
+.mhs-hero-card .mhs-hero-info {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.mhs-hero-card .mhs-hero-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #f5c542;
+}
+
+.mhs-hero-card h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.35;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.mhs-hero-card .mhs-hero-sub {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.mhs-hero-card .mhs-hero-nextstep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(245, 197, 66, 0.2);
+  border: 1px solid rgba(245, 197, 66, 0.35);
+  color: #fef0c7;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.mhs-hero-card .mhs-hero-nextstep .material-symbols-outlined {
+  font-size: 1.1rem;
+}
+
+.mhs-hero-progress-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mhs-hero-progress-ring .mhs-ring-wrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+}
+
+.mhs-hero-progress-ring svg {
+  width: 110px;
+  height: 110px;
+  transform: rotate(-90deg);
+}
+
+.mhs-hero-progress-ring .mhs-ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 8;
+}
+
+.mhs-hero-progress-ring .mhs-ring-fg {
+  fill: none;
+  stroke: #f5c542;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mhs-hero-progress-ring .mhs-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.mhs-hero-progress-ring .mhs-ring-status {
+  text-align: center;
+}
+
+/* ================================================
+   MAHASISWA — Visual Stepper
+   ================================================ */
+
+.mhs-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 1.5rem 1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mhs-stepper::-webkit-scrollbar {
+  display: none;
+}
+
+.mhs-stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 110px;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.mhs-stepper-step:hover {
+  transform: translateY(-2px);
+}
+
+.mhs-stepper-step::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: calc(-50% + 18px);
+  right: calc(50% + 18px);
+  height: 3px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  transition: background 0.4s;
+  z-index: 0;
+}
+
+.mhs-stepper-step:first-child::before {
+  display: none;
+}
+
+.mhs-stepper-step.done::before {
+  background: #10b981;
+}
+
+.mhs-stepper-step.active::before {
+  background: linear-gradient(90deg, #10b981, #0b5fc0);
+}
+
+.mhs-stepper-node {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  border: 3px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+  transition: all 0.3s;
+  z-index: 1;
+}
+
+.mhs-stepper-step.done .mhs-stepper-node {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.mhs-stepper-step.active .mhs-stepper-node {
+  background: #0b5fc0;
+  border-color: #0b5fc0;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(11, 95, 192, 0.2);
+  animation: mhs-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mhs-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(11, 95, 192, 0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(11, 95, 192, 0.1); }
+}
+
+.mhs-stepper-node .material-symbols-outlined {
+  font-size: 1.15rem;
+}
+
+.mhs-stepper-label {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  line-height: 1.3;
+  max-width: 90px;
+}
+
+.mhs-stepper-step.done .mhs-stepper-label {
+  color: #10b981;
+}
+
+.mhs-stepper-step.active .mhs-stepper-label {
+  color: #0b5fc0;
+  font-weight: 800;
+}
+
+/* ================================================
+   MAHASISWA — Stage Detail Cards
+   ================================================ */
+
+.mhs-stage-cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.mhs-stage-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mhs-stage-card:hover {
+  border-color: #94a3b8;
+}
+
+.mhs-stage-card.mhs-stage-active {
+  border-color: #0b5fc0;
+  box-shadow: 0 4px 20px rgba(11, 95, 192, 0.1);
+}
+
+.mhs-stage-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mhs-stage-card-header:hover {
+  background: #f8fafc;
+}
+
+.mhs-stage-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mhs-stage-card-title .mhs-stage-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.85rem;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.mhs-stage-card.mhs-stage-done .mhs-stage-icon {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.mhs-stage-card.mhs-stage-active .mhs-stage-icon {
+  background: #eff6ff;
+  color: #0b5fc0;
+}
+
+.mhs-stage-card-title > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.mhs-stage-card-title h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.mhs-stage-card-title p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.mhs-stage-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mhs-stage-card-badges .mhs-chevron {
+  color: #64748b;
+  transition: transform 0.3s;
+}
+
+.mhs-stage-card.mhs-stage-open .mhs-chevron {
+  transform: rotate(180deg);
+}
+
+.mhs-stage-card-body {
+  padding: 0 1.25rem 1.25rem;
+  display: grid;
+  gap: 1rem;
+  animation: mhs-slideDown 0.3s ease;
+}
+
+@keyframes mhs-slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mhs-stage-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.mhs-stage-detail-item {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.mhs-stage-detail-item label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.mhs-stage-detail-item span {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.mhs-stage-berkas-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mhs-stage-berkas-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+.mhs-stage-berkas-item > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.mhs-stage-berkas-item strong {
+  font-size: 0.82rem;
+  color: #0f172a;
+}
+
+.mhs-stage-berkas-item span {
+  font-size: 0.76rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mhs-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ================================================
+   MAHASISWA — Timeline Vertikal (Progress Saya)
+   ================================================ */
+
+.mhs-timeline {
+  position: relative;
+  padding-left: 2.5rem;
+}
+
+.mhs-timeline::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  z-index: 0;
+}
+
+.mhs-timeline-node {
+  position: relative;
+  padding-bottom: 1.5rem;
+}
+
+.mhs-timeline-node:last-child {
+  padding-bottom: 0;
+}
+
+.mhs-timeline-dot {
+  position: absolute;
+  left: -2.5rem;
+  top: 0.15rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  border: 3px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 0.85rem;
+  transition: all 0.3s;
+}
+
+.mhs-timeline-node.done .mhs-timeline-dot {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.mhs-timeline-node.active .mhs-timeline-dot {
+  background: #0b5fc0;
+  border-color: #0b5fc0;
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(11, 95, 192, 0.15);
+}
+
+.mhs-timeline-dot .material-symbols-outlined {
+  font-size: 1rem;
+}
+
+.mhs-timeline-content {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1rem 1.2rem;
+  background: #ffffff;
+  transition: border-color 0.2s;
+}
+
+.mhs-timeline-node.active .mhs-timeline-content {
+  border-color: #0b5fc0;
+  box-shadow: 0 2px 12px rgba(11, 95, 192, 0.06);
+}
+
+.mhs-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.mhs-timeline-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.mhs-timeline-desc {
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* ================================================
+   MAHASISWA — Riwayat Sidang Cards
+   ================================================ */
+
+.mhs-riwayat-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.mhs-riwayat-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mhs-riwayat-card:hover {
+  border-color: #0b5fc0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.mhs-riwayat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mhs-riwayat-card-header:hover {
+  background: #f8fafc;
+}
+
+.mhs-riwayat-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.mhs-riwayat-card-left .mhs-riwayat-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 900;
+  font-size: 1.1rem;
+  background: #eff6ff;
+  color: #0b5fc0;
+}
+
+.mhs-riwayat-card-left > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.mhs-riwayat-card-left h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.mhs-riwayat-card-left p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mhs-riwayat-card-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.mhs-riwayat-card-right .mhs-chevron {
+  color: #64748b;
+  transition: transform 0.3s;
+}
+
+.mhs-riwayat-card.mhs-riwayat-open .mhs-riwayat-card-right .mhs-chevron {
+  transform: rotate(180deg);
+}
+
+.mhs-riwayat-card-body {
+  padding: 0 1.25rem 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+  animation: mhs-slideDown 0.3s ease;
+}
+
+.mhs-riwayat-detail-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem;
+}
+
+.mhs-riwayat-detail-item {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.mhs-riwayat-detail-item label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.mhs-riwayat-detail-item span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* ================================================
+   MAHASISWA — Responsive
+   ================================================ */
+
+@media (max-width: 768px) {
+  .mhs-hero-card {
+    padding: 1.5rem 1.2rem;
+  }
+
+  .mhs-hero-card .mhs-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .mhs-hero-progress-ring {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .mhs-hero-progress-ring .mhs-ring-wrap {
+    width: 80px;
+    height: 80px;
+  }
+
+  .mhs-hero-progress-ring svg {
+    width: 80px;
+    height: 80px;
+  }
+
+  .mhs-hero-progress-ring .mhs-ring-label {
+    font-size: 1.2rem;
+  }
+
+  .mhs-hero-card h2 {
+    font-size: 1.2rem;
+  }
+
+  .mhs-stepper {
+    padding: 1rem 0.5rem;
+  }
+
+  .mhs-stepper-step {
+    min-width: 80px;
+  }
+
+  .mhs-stage-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mhs-riwayat-detail-row {
+    grid-template-columns: 1fr;
+  }
+
+  .mhs-riwayat-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mhs-riwayat-card-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

@@ -9,6 +9,7 @@ import SectionCard from "../../components/ui/SectionCard";
 import StatusBadge from "../../components/ui/StatusBadge";
 import MetricCard from "../../components/ui/MetricCard";
 import { getSidangList, type SidangItem } from "../../services/sidang";
+import EmptyState from "../../components/ui/EmptyState";
 
 const workflowOrder = [
   "SEMINAR_PROPOSAL",
@@ -74,9 +75,8 @@ function getJadwalLabel(item: SidangItem) {
 
   const ruang = `${jadwal.ruang?.code || ""} ${jadwal.ruang?.name || ""}`.trim();
 
-  return `${formatDateTime(jadwal.waktuMulai)} • ${
-    ruang || "Tempat manual / online"
-  }`;
+  return `${formatDateTime(jadwal.waktuMulai)} • ${ruang || "Tempat manual / online"
+    }`;
 }
 
 function getPengujiLabels(item: SidangItem) {
@@ -203,9 +203,10 @@ function groupRowsBySkripsi(rows: SidangItem[]): WorkflowGroup[] {
 }
 
 export default function RiwayatWorkflowSidangPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasRole } = useAuth();
 
-  const canReadSidang = hasPermission("sidang.read");
+  const isMahasiswa = hasRole("mahasiswa");
+  const canReadSidang = hasPermission("sidang.read") || isMahasiswa;
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
@@ -215,6 +216,7 @@ export default function RiwayatWorkflowSidangPage() {
   const [limit, setLimit] = useState(10);
   const [selectedGroup, setSelectedGroup] = useState<WorkflowGroup | null>(null);
   const [detailActiveTab, setDetailActiveTab] = useState<string | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedGroup) {
@@ -238,11 +240,9 @@ export default function RiwayatWorkflowSidangPage() {
 
     return groupRowsBySkripsi(rows)
       .filter((group) => {
-        const searchable = `${group.skripsi?.title ?? ""} ${
-          group.skripsi?.mahasiswa?.name ?? ""
-        } ${group.skripsi?.mahasiswa?.identifier ?? ""} ${
-          group.currentStage
-        } ${group.currentStatus} ${group.finalStatus ?? ""}`.toLowerCase();
+        const searchable = `${group.skripsi?.title ?? ""} ${group.skripsi?.mahasiswa?.name ?? ""
+          } ${group.skripsi?.mahasiswa?.identifier ?? ""} ${group.currentStage
+          } ${group.currentStatus} ${group.finalStatus ?? ""}`.toLowerCase();
 
         if (keyword && !searchable.includes(keyword)) return false;
 
@@ -311,31 +311,33 @@ export default function RiwayatWorkflowSidangPage() {
         description="Pantau perjalanan mahasiswa dari Seminar Proposal, Seminar Hasil, Sidang Kompre, hingga Sidang Akhir."
       />
 
-      <div className="workflow-tabs workflow-tabs-global">
-        <button
-          type="button"
-          className={`workflow-tab ${stageFilter === "" ? "active" : ""}`}
-          onClick={() => {
-            setStageFilter("");
-            setPage(1);
-          }}
-        >
-          Semua Tahap
-        </button>
-        {workflowOrder.map((stage) => (
+      {!isMahasiswa && (
+        <div className="workflow-tabs workflow-tabs-global">
           <button
-            key={stage}
             type="button"
-            className={`workflow-tab ${stageFilter === stage ? "active" : ""}`}
+            className={`workflow-tab ${stageFilter === "" ? "active" : ""}`}
             onClick={() => {
-              setStageFilter(stage);
+              setStageFilter("");
               setPage(1);
             }}
           >
-            {workflowLabels[stage]}
+            Semua Tahap
           </button>
-        ))}
-      </div>
+          {workflowOrder.map((stage) => (
+            <button
+              key={stage}
+              type="button"
+              className={`workflow-tab ${stageFilter === stage ? "active" : ""}`}
+              onClick={() => {
+                setStageFilter(stage);
+                setPage(1);
+              }}
+            >
+              {workflowLabels[stage]}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="metric-grid">
         <MetricCard
@@ -363,274 +365,354 @@ export default function RiwayatWorkflowSidangPage() {
         />
       </div>
 
-      <SectionCard
-        title="Daftar Riwayat Skripsi"
-        description="Data disusun per skripsi dengan detail attempt tiap tahap."
-      >
-        <DataTable<WorkflowGroup>
-          data={paginatedRows}
-          isLoading={sidangQuery.isLoading}
-          loadingMessage="Memuat riwayat workflow..."
-          emptyMessage="Belum ada riwayat workflow"
-          getRowKey={(item) => item.skripsiId}
-          toolbar={
-            <FilterToolbar
-              searchValue={search}
-              onSearchChange={(value) => {
-                setSearch(value);
-                setPage(1);
-              }}
-              searchPlaceholder="Cari judul, mahasiswa, NPM, tahap..."
-              meta={
-                <span>
-                  Menampilkan <strong>{paginatedRows.length}</strong> dari{" "}
-                  <strong>{totalRows}</strong> riwayat.
-                </span>
-              }
-            >
-              <div className="filter-field">
-                <label>Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(event) => {
-                    setStatusFilter(event.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="">Semua Status</option>
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="filter-field">
-                <label>Hasil</label>
-                <select
-                  value={finalFilter}
-                  onChange={(event) => {
-                    setFinalFilter(event.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="">Semua Hasil</option>
-                  {finalOptions.map((hasil) => (
-                    <option key={hasil} value={hasil}>
-                      {hasil}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </FilterToolbar>
-          }
-          columns={[
-            {
-              key: "mahasiswa",
-              header: "Mahasiswa",
-              mobilePriority: "title",
-              render: (item) => (
-                <div className="table-title-cell">
-                  <strong>{item.skripsi?.mahasiswa?.name || "-"}</strong>
-                  <span>{item.skripsi?.mahasiswa?.identifier || "-"}</span>
-                </div>
-              )
-            },
-            {
-              key: "judul",
-              header: "Judul Skripsi",
-              mobilePriority: "subtitle",
-              render: (item) => (
-                <div className="table-title-cell">
-                  <strong>{item.skripsi?.title || "Tanpa judul"}</strong>
-                  <span>{item.skripsi?.peminatan?.name || "-"}</span>
-                </div>
-              )
-            },
-            {
-              key: "tahap",
-              header: "Tahap Terakhir",
-              render: (item) => workflowLabels[item.currentStage] || item.currentStage
-            },
-            {
-              key: "status",
-              header: "Status",
-              align: "center",
-              mobilePriority: "meta",
-              render: (item) => <StatusBadge value={item.currentStatus} size="sm" />
-            },
-            {
-              key: "progress",
-              header: "Progress",
-              align: "center",
-              render: (item) => (
-                <div className="workflow-final-status">
-                  <strong>{item.progressPercent}%</strong>
-                </div>
-              )
-            },
-            {
-              key: "jumlah",
-              header: "Tahap",
-              align: "center",
-              render: (item) => `${item.rows.length} data`
-            },
-            {
-              key: "detail",
-              header: "Detail",
-              align: "center",
-              render: (item) => (
-                <button
-                  type="button"
-                  className="small-button"
-                  onClick={() => setSelectedGroup(item)}
-                >
-                  Detail
-                </button>
-              )
-            }
-          ]}
-          pagination={{
-            page: currentPage,
-            pageSize: limit,
-            total: totalRows,
-            onPageChange: setPage,
-            onPageSizeChange: (pageSize) => {
-              setLimit(pageSize);
-              setPage(1);
-            },
-            itemLabel: "riwayat"
-          }}
-          mobileTitle={(item) => item.skripsi?.mahasiswa?.name || "-"}
-          mobileSubtitle={(item) => item.skripsi?.title || "Tanpa judul"}
-          mobileMeta={(item) => (
-            <StatusBadge value={item.currentStatus} size="sm" />
-          )}
-        />
-      </SectionCard>
-
-      <DetailPanel
-        open={Boolean(selectedGroup)}
-        title="Detail Riwayat Workflow"
-        subtitle={selectedGroup?.skripsi?.title || "Tanpa judul"}
-        width="lg"
-        onClose={() => setSelectedGroup(null)}
-      >
-        {selectedGroup ? (
-          <div className="page-stack">
-            <div className="workflow-history-head">
-              <div>
-                <p className="eyebrow">
-                  {selectedGroup.skripsi?.mahasiswa?.identifier || "-"}
-                </p>
-                <h2>{selectedGroup.skripsi?.mahasiswa?.name || "-"}</h2>
-                <p className="muted">
-                  Progress akademik {selectedGroup.progressPercent}%
-                </p>
-              </div>
-
-              <div className="workflow-final-status">
-                <StatusBadge
-                  value={selectedGroup.finalStatus || selectedGroup.currentStatus}
-                  size="md"
-                />
-                <strong>{selectedGroup.progressPercent}%</strong>
-              </div>
-            </div>
-
-            <div className="workflow-progress-track">
-              <span style={{ width: `${selectedGroup.progressPercent}%` }} />
-            </div>
-
-            <div className="workflow-detail-tabs">
-              {workflowOrder
-                .filter((stage) =>
-                  selectedGroup.rows.some((r) => r.jenis === stage)
-                )
-                .map((stage) => (
-                  <button
-                    key={stage}
-                    type="button"
-                    className={`workflow-detail-tab ${
-                      detailActiveTab === stage ? "active" : ""
-                    }`}
-                    onClick={() => setDetailActiveTab(stage)}
-                  >
-                    <span className="tab-label">{workflowLabels[stage]}</span>
-                  </button>
-                ))}
-            </div>
-
-            <DataTable<SidangItem>
-              data={selectedGroup.rows.filter(
-                (r) => r.jenis === detailActiveTab
-              )}
-              emptyMessage="Belum ada tahap"
-              compact
-              columns={[
-                {
-                  key: "tahap",
-                  header: "Tahap",
-                  mobilePriority: "title",
-                  render: (item) => (
-                    <div className="table-title-cell">
-                      <strong>{workflowLabels[item.jenis] || item.jenis}</strong>
-                      <span>Attempt {item.attemptNo}</span>
-                    </div>
-                  )
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  align: "center",
-                  mobilePriority: "meta",
-                  render: (item) => <StatusBadge value={item.status} size="sm" />
-                },
-                {
-                  key: "hasil",
-                  header: "Hasil",
-                  align: "center",
-                  render: (item) =>
-                    item.hasil ? (
-                      <StatusBadge value={item.hasil} size="sm" />
-                    ) : (
-                      <span className="muted">-</span>
-                    )
-                },
-                {
-                  key: "nilai",
-                  header: "Nilai",
-                  render: (item) => getNilaiSummary(item)
-                },
-                {
-                  key: "jadwal",
-                  header: "Jadwal",
-                  render: (item) => getJadwalLabel(item)
-                },
-                {
-                  key: "penguji",
-                  header: "Penguji",
-                  render: (item) => getPengujiLabels(item)
-                },
-                {
-                  key: "berkas",
-                  header: "Berkas",
-                  render: (item) => getBerkasSummary(item)
-                },
-                {
-                  key: "akhir",
-                  header: "Status Akhir",
-                  render: (item) => getFinalLabel(item)
-                }
-              ]}
-              mobileTitle={(item) => workflowLabels[item.jenis] || item.jenis}
-              mobileSubtitle={(item) => `Attempt ${item.attemptNo}`}
-              mobileMeta={(item) => <StatusBadge value={item.status} size="sm" />}
+      {isMahasiswa ? (
+        <SectionCard
+          title="Riwayat Sidang Anda"
+          description="Daftar riwayat persidangan yang pernah Anda jalani."
+        >
+          {sidangQuery.isLoading ? (
+            <EmptyState title="Memuat riwayat..." description="Mohon tunggu sebentar." />
+          ) : paginatedRows.length === 0 ? (
+            <EmptyState
+              title="Belum ada riwayat"
+              description="Anda belum memiliki riwayat sidang."
             />
-          </div>
-        ) : null}
-      </DetailPanel>
+          ) : (
+            <div className="mhs-riwayat-list">
+              {paginatedRows.map((group) => {
+                const isExpanded = expandedCard === group.skripsiId;
+
+                return (
+                  <div
+                    key={group.skripsiId}
+                    className={`mhs-riwayat-card ${isExpanded ? 'mhs-riwayat-open' : ''}`}
+                  >
+                    <div
+                      className="mhs-riwayat-card-header"
+                      onClick={() => setExpandedCard(isExpanded ? null : group.skripsiId)}
+                    >
+                      <div className="mhs-riwayat-card-left">
+                        <div className="mhs-riwayat-icon">
+                          <span className="material-symbols-outlined">history</span>
+                        </div>
+                        <div>
+                          <h3>{group.skripsi?.title || "Tanpa Judul"}</h3>
+                          <p>Tahap Terakhir: {workflowLabels[group.currentStage] || group.currentStage}</p>
+                        </div>
+                      </div>
+                      <div className="mhs-riwayat-card-right">
+                        <StatusBadge value={group.currentStatus} size="sm" />
+                        <span className="material-symbols-outlined mhs-chevron">expand_more</span>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mhs-riwayat-card-body">
+                        {group.rows.map((row, idx) => (
+                          <div key={row.id || idx} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none', paddingTop: idx > 0 ? '1rem' : '0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                              <strong>{workflowLabels[row.jenis] || row.jenis} (Attempt {row.attemptNo || 1})</strong>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <StatusBadge value={row.status} size="sm" />
+                                {row.hasil && <StatusBadge value={row.hasil} size="sm" />}
+                              </div>
+                            </div>
+
+                            <div className="mhs-riwayat-detail-row">
+                              <div className="mhs-riwayat-detail-item">
+                                <label>Jadwal</label>
+                                <span>{getJadwalLabel(row)}</span>
+                              </div>
+                              <div className="mhs-riwayat-detail-item">
+                                <label>Penguji</label>
+                                <span>{getPengujiLabels(row)}</span>
+                              </div>
+                              <div className="mhs-riwayat-detail-item">
+                                <label>Nilai</label>
+                                <span>{getNilaiSummary(row)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+      ) : (
+        <SectionCard
+          title="Daftar Riwayat Skripsi"
+          description="Data disusun per skripsi dengan detail attempt tiap tahap."
+        >
+          <DataTable<WorkflowGroup>
+            data={paginatedRows}
+            isLoading={sidangQuery.isLoading}
+            loadingMessage="Memuat riwayat workflow..."
+            emptyMessage="Belum ada riwayat workflow"
+            getRowKey={(item) => item.skripsiId}
+            toolbar={
+              <FilterToolbar
+                searchValue={search}
+                onSearchChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                searchPlaceholder="Cari judul, mahasiswa, NPM, tahap..."
+                meta={
+                  <span>
+                    Menampilkan <strong>{paginatedRows.length}</strong> dari{" "}
+                    <strong>{totalRows}</strong> riwayat.
+                  </span>
+                }
+              >
+                <div className="filter-field">
+                  <label>Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="">Semua Status</option>
+                    {statusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="filter-field">
+                  <label>Hasil</label>
+                  <select
+                    value={finalFilter}
+                    onChange={(event) => {
+                      setFinalFilter(event.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="">Semua Hasil</option>
+                    {finalOptions.map((hasil) => (
+                      <option key={hasil} value={hasil}>
+                        {hasil}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </FilterToolbar>
+            }
+            columns={[
+              {
+                key: "mahasiswa",
+                header: "Mahasiswa",
+                mobilePriority: "title",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{item.skripsi?.mahasiswa?.name || "-"}</strong>
+                    <span>{item.skripsi?.mahasiswa?.identifier || "-"}</span>
+                  </div>
+                )
+              },
+              {
+                key: "judul",
+                header: "Judul Skripsi",
+                mobilePriority: "subtitle",
+                render: (item) => (
+                  <div className="table-title-cell">
+                    <strong>{item.skripsi?.title || "Tanpa judul"}</strong>
+                    <span>{item.skripsi?.peminatan?.name || "-"}</span>
+                  </div>
+                )
+              },
+              {
+                key: "tahap",
+                header: "Tahap Terakhir",
+                render: (item) => workflowLabels[item.currentStage] || item.currentStage
+              },
+              {
+                key: "status",
+                header: "Status",
+                align: "center",
+                mobilePriority: "meta",
+                render: (item) => <StatusBadge value={item.currentStatus} size="sm" />
+              },
+              {
+                key: "progress",
+                header: "Progress",
+                align: "center",
+                render: (item) => (
+                  <div className="workflow-final-status">
+                    <strong>{item.progressPercent}%</strong>
+                  </div>
+                )
+              },
+              {
+                key: "jumlah",
+                header: "Tahap",
+                align: "center",
+                render: (item) => `${item.rows.length} data`
+              },
+              {
+                key: "detail",
+                header: "Detail",
+                align: "center",
+                render: (item) => (
+                  <button
+                    type="button"
+                    className="small-button"
+                    onClick={() => setSelectedGroup(item)}
+                  >
+                    Detail
+                  </button>
+                )
+              }
+            ]}
+            pagination={{
+              page: currentPage,
+              pageSize: limit,
+              total: totalRows,
+              onPageChange: setPage,
+              onPageSizeChange: (pageSize) => {
+                setLimit(pageSize);
+                setPage(1);
+              },
+              itemLabel: "riwayat"
+            }}
+            mobileTitle={(item) => item.skripsi?.mahasiswa?.name || "-"}
+            mobileSubtitle={(item) => item.skripsi?.title || "Tanpa judul"}
+            mobileMeta={(item) => (
+              <StatusBadge value={item.currentStatus} size="sm" />
+            )}
+          />
+        </SectionCard>
+      )}
+
+      {!isMahasiswa && (
+        <DetailPanel
+          open={Boolean(selectedGroup)}
+          title="Detail Riwayat Workflow"
+          subtitle={selectedGroup?.skripsi?.title || "Tanpa judul"}
+          width="lg"
+          onClose={() => setSelectedGroup(null)}
+        >
+          {selectedGroup ? (
+            <div className="page-stack">
+              <div className="workflow-history-head">
+                <div>
+                  <p className="eyebrow">
+                    {selectedGroup.skripsi?.mahasiswa?.identifier || "-"}
+                  </p>
+                  <h2>{selectedGroup.skripsi?.mahasiswa?.name || "-"}</h2>
+                  <p className="muted">
+                    Progress akademik {selectedGroup.progressPercent}%
+                  </p>
+                </div>
+
+                <div className="workflow-final-status">
+                  <StatusBadge
+                    value={selectedGroup.finalStatus || selectedGroup.currentStatus}
+                    size="md"
+                  />
+                  <strong>{selectedGroup.progressPercent}%</strong>
+                </div>
+              </div>
+
+              <div className="workflow-progress-track">
+                <span style={{ width: `${selectedGroup.progressPercent}%` }} />
+              </div>
+
+              <div className="workflow-detail-tabs">
+                {workflowOrder
+                  .filter((stage) =>
+                    selectedGroup.rows.some((r) => r.jenis === stage)
+                  )
+                  .map((stage) => (
+                    <button
+                      key={stage}
+                      type="button"
+                      className={`workflow-detail-tab ${detailActiveTab === stage ? "active" : ""
+                        }`}
+                      onClick={() => setDetailActiveTab(stage)}
+                    >
+                      <span className="tab-label">{workflowLabels[stage]}</span>
+                    </button>
+                  ))}
+              </div>
+
+              <DataTable<SidangItem>
+                data={selectedGroup.rows.filter(
+                  (r) => r.jenis === detailActiveTab
+                )}
+                emptyMessage="Belum ada tahap"
+                compact
+                columns={[
+                  {
+                    key: "tahap",
+                    header: "Tahap",
+                    mobilePriority: "title",
+                    render: (item) => (
+                      <div className="table-title-cell">
+                        <strong>{workflowLabels[item.jenis] || item.jenis}</strong>
+                        <span>Attempt {item.attemptNo}</span>
+                      </div>
+                    )
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    align: "center",
+                    mobilePriority: "meta",
+                    render: (item) => <StatusBadge value={item.status} size="sm" />
+                  },
+                  {
+                    key: "hasil",
+                    header: "Hasil",
+                    align: "center",
+                    render: (item) =>
+                      item.hasil ? (
+                        <StatusBadge value={item.hasil} size="sm" />
+                      ) : (
+                        <span className="muted">-</span>
+                      )
+                  },
+                  {
+                    key: "nilai",
+                    header: "Nilai",
+                    render: (item) => getNilaiSummary(item)
+                  },
+                  {
+                    key: "jadwal",
+                    header: "Jadwal",
+                    render: (item) => getJadwalLabel(item)
+                  },
+                  {
+                    key: "penguji",
+                    header: "Penguji",
+                    render: (item) => getPengujiLabels(item)
+                  },
+                  {
+                    key: "berkas",
+                    header: "Berkas",
+                    render: (item) => getBerkasSummary(item)
+                  },
+                  {
+                    key: "akhir",
+                    header: "Status Akhir",
+                    render: (item) => getFinalLabel(item)
+                  }
+                ]}
+                mobileTitle={(item) => workflowLabels[item.jenis] || item.jenis}
+                mobileSubtitle={(item) => `Attempt ${item.attemptNo}`}
+                mobileMeta={(item) => <StatusBadge value={item.status} size="sm" />}
+              />
+            </div>
+          ) : null}
+        </DetailPanel>
+      )}
     </section>
   );
 }

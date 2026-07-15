@@ -16,9 +16,6 @@ import skripsiRoutes from "./modules/skripsi/skripsi.routes.js";
 import bimbinganRoutes from "./modules/bimbingan/bimbingan.routes.js";
 import jadwalSidangRoutes from "./modules/jadwal-sidang/jadwal-sidang.routes.js";
 import peminjamanRuangRoutes from "./modules/peminjaman-ruang/peminjaman-ruang.routes.js";
-import nilaiSidangRoutes from "./modules/nilai-sidang/nilai-sidang.routes.js";
-import revisiSidangRoutes from "./modules/revisi-sidang/revisi-sidang.routes.js";
-import finalisasiRoutes from "./modules/finalisasi/finalisasi.routes.js";
 import notificationRoutes from "./modules/notifications/notifications.routes.js";
 import gamificationRoutes from "./modules/gamification/gamification.routes.js";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
@@ -65,6 +62,14 @@ app.use(
   })
 );
 
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
@@ -78,9 +83,6 @@ app.use("/api/workflow", workflowRoutes);
 app.use("/api/bimbingan", bimbinganRoutes);
 app.use("/api/jadwal-sidang", jadwalSidangRoutes);
 app.use("/api/peminjaman-ruang", peminjamanRuangRoutes);
-app.use("/api/nilai-sidang", nilaiSidangRoutes);
-app.use("/api/revisi-sidang", revisiSidangRoutes);
-app.use("/api/finalisasi", finalisasiRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/gamification", gamificationRoutes);
 app.use("/api/dashboard", dashboardRoutes);

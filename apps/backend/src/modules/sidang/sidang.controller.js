@@ -2165,7 +2165,7 @@ export async function uploadBerkasFinalSidang(req, res, next) {
         skripsiId: sidang.skripsiId,
         sidangId: sidang.id,
         uploadedById: req.user.id,
-        kategori: "BERKAS_FINAL",
+        kategori: "FINAL_SKRIPSI",
         status: "DISETUJUI",
         ...filePayload
       }
